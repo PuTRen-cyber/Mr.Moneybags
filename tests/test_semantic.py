@@ -281,7 +281,8 @@ class SemanticTest(unittest.TestCase):
 
     def test_default_cli_omits_empty_semantic_metadata(self):
         output = StringIO()
-        with patch('builtins.input', return_value='Add a local parser.'), patch('sys.stdout', output):
+        with patch.dict('os.environ', {'MR_MONEYBAGS_SEMANTIC_MODE': 'deterministic'}), \
+                patch('builtins.input', return_value='Add a local parser.'), patch('sys.stdout', output):
             self.assertEqual(main(), 0)
         self.assertNotIn('"protected_target": null', output.getvalue())
         self.assertNotIn('"implementation_delegation": null', output.getvalue())

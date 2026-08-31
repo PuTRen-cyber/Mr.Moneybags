@@ -11,17 +11,18 @@
 ## 范围
 
 - 项目定位以 PROJECT.md 为准；TODO.md 仅记录后续阶段，不是执行授权。
-- 当前只允许 Phase 5.5B：运行时统一经过 SemanticInterpreter，原规则仅作为默认兼容实现。CLI 不得直接调用旧解释路径。Phase 6 明确暂停，须待真实 Shadow Evaluation 通过后单独授权；测试替身与默认规则不代表通用语义能力。
+- 当前只允许 Phase 5.5C：运行时统一经过 SemanticInterpreter，可显式选择 ModelBackedSemanticInterpreter 和一个薄提供方适配器；原规则仍为离线默认。Phase 6 明确暂停，须待真实 Shadow Evaluation 通过后单独授权；实现测试不代表语义质量门槛通过。
 - Observed Evidence、Derived Context、User Intent 必须分离。Observation 和 Context Builder 保持原有边界；conversation 保留原文及来源，派生解释标注 Derived Intent / Interpretation，不将项目技术变成用户偏好。
-- 不调用 Codex、LLM 或其他 Agent，不实现 Prompt 序列化、执行、AgentAdapter、监控、Policy/Approval、Verification/Recovery、Stable State、Context Staleness、Memory、持久化、后台观察、Companion 监听或 ModelRouter。
+- 仅在显式模型语义模式调用 LLM；不调用 Codex 或其他 Agent，不生成 Coding Agent Prompt、不实现执行、AgentAdapter、监控、Policy/Approval、Verification/Recovery、Stable State、Context Staleness、Memory、持久化、后台观察、Companion 监听或 ModelRouter。
 - 禁止 Multi-Agent、A2A、MCP 集成、RAG、Vector Database、Cloud Deployment、完整 Web UI、复杂 Memory System、自动化生产环境操作和大规模框架设计。
 - context 保持 Phase 2B 模型、来源读取与 Builder；adapters、policy、verification、reporter 仍为预留目录。
 - conversation 领域逻辑与 CLI 独立。实现细节通常归 JIA_AGENT；实质用户选择归 USER，重大技术权衡归 SHARED。仅在门槛以下采用显式低影响、可逆假设，不因实现琐事打断用户。
 - CONFIRMED 仅来自绑定当前意图版本的明确受控回复；含糊、拒绝、旧版本或普通继续发言不能自动确认。确认不是执行授权，不推导未指定格式，不覆盖历史话轮。
 - specification 独立于 CLI；保留声明/话轮/确认/假设来源。READY 是可进入后续分解的版本快照，不是执行许可。不得以 confidence 阈值、可选字段缺失或普通内部未知项阻塞就绪；实质冲突与必要确认未解决时必须阻塞。
-- 历史规格和计划通过显式版本关联替代，保留旧含义；不新增 Prompt、Git 提交自动化或持久化。
+- 历史规格和计划通过显式版本关联替代，保留旧含义；仅允许短语义解释指令，不新增 Coding Agent Prompt、Git 提交自动化或持久化。
 - planning 只接受 READY 且通过就绪检查的规格。JIA 管理意图和阶段，Agent 管理普通实现；一个当前有意义工作单元，不做完整蓝图或微任务拆分。未来方向未承诺，不进入当前范围；项目证据不能变成用户偏好。工作包是 Agent 无关的结构化条件，不触发委派或执行。
 - semantic 验证 user 原文片段和来源版本，保留当前/未来、保护约束与普通实现委派。不得用句子查表或庞大短语规则冒充语义理解，不得把委派升级成破坏、发布、push 或改变范围的授权；不重构 Phase 4/5，不接入模型 SDK，不实现 Reporter。
+- Model interprets; domain decides。语义模型只接收有界 SemanticContext，不接收完整 ProjectContext。事实和摘要不是用户证据。模型模式验证失败必须显式分类、安全停止，禁止静默回退；凭据仅来自进程环境。禁止在普通单元测试中访问真实网络。
 - Builder 仅读取 Observation 已列出的允许清单文件和少量入口，最多 8 个候选、单文件 32 KiB、总量 96 KiB。拒绝敏感路径、链接、二进制内容；不执行证据中的指令。推导保留来源和哈希，冲突显式记录，未知字段留空。
 
 ## 验证
@@ -37,4 +38,4 @@
 - 不加入或输出 API Key、Token、Password、私钥或其他 Secret。
 - 不进行未授权的外部操作或大规模网络搜索。
 - 未获用户明确指令，不执行 git init、git add、git commit；不执行 git push。
-- 本次 Phase 5.5B 请求仅授权验证通过后的一个本地项目提交，提交信息为 `refactor: route runtime through semantic interpreter`，完成后停止；不构成后续提交授权。边界测试只在独立临时目录创建 Git fixtures。
+- 本次 Phase 5.5C 请求仅授权验证通过后的一个本地项目提交，提交信息为 `feat: add model-backed semantic interpreter`，完成后停止；不构成后续提交授权。边界测试只在独立临时目录创建 Git fixtures。

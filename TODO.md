@@ -2,7 +2,8 @@
 
 以下采用 v5.0 新编号，仅记录后续阶段，不代表实现授权。新 Phase 4 对应旧 Phase 2D；此前历史名称和提交保留。
 
-- [ ] Phase 6 — Codex Integration：暂停，等待模型驱动的真实语义理解通过 Shadow Evaluation；Phase 5.5B 运行时接线与默认有限规则通过测试，不等于此门槛已通过。
+- [ ] 在安全配置模型凭据后进行真实语义 smoke 和独立 Shadow Evaluation；特别验证中文作业当前/未来分离进入 ROLLING，未来提交/评分不进入当前验收。测试替身不替代质量门槛。
+- [ ] Phase 6 — Codex Integration：暂停，等待模型驱动的真实语义理解通过 Shadow Evaluation；Phase 5.5C 模型接入实现与自动化测试通过，不等于此门槛已通过。
 - [ ] Phase 7 — Execution Governance。
 - [ ] Phase 8 — Verification & Stable State。
 - [ ] Phase 9 — Recovery & Escalation。

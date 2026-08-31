@@ -4,7 +4,7 @@
 
 **土老板负责目标，小江负责管理，Agent 负责执行。**
 
-当前为 Phase 5.5B — Runtime Semantic Interpretation Path：真实 CLI 统一经过 SemanticInterpreter → 语义验证 → CurrentIntent → 既有 Phase 4/5。默认解释器在接口内部复用原有限规则，未接入真实模型。六个部分展示 JSON 后退出。不调用 LLM、Codex 或其他 Agent，不执行任务或文档命令、不持久化，不启动聊天循环。
+当前为 Phase 5.5C — Model-backed Semantic Interpreter：CLI 统一经过 SemanticInterpreter → 语义验证 → CurrentIntent → 既有 Phase 4/5。默认仍使用有限确定性规则，显式模型模式可调用真实语义模型。展示 JSON 后退出，不调用 Codex 或 Coding Agent，不执行任务或文档命令、不持久化，不启动聊天循环。
 
 v5.0 路线图已重编号：旧 Phase 2A/2B 合并为新 Phase 2，旧 Phase 2C 对应新 Phase 3，旧 Phase 2D 对应新 Phase 4。没有跳过阶段，也没有重写已接受实现或 Git 历史。完整路线图见 PROJECT.md。
 
@@ -32,6 +32,41 @@ Task: 请整理本周工作计划
 - `status`：初始为 `NEW`。
 
 空白任务会显示错误并以退出码 1 结束；输入流结束时不创建 Task，以退出码 0 结束。
+
+## 模型语义模式
+
+**Model interprets; domain decides.** 模型只解释输入；READY/BLOCKED、FAST_PATH/ROLLING、当前工作单元和工作包仍由既有领域规则决定。实现完成不代表真实 Shadow Evaluation 已通过，Phase 6 仍暂停。
+
+唯一具体适配器使用标准库调用 OpenAI Responses API，并要求严格 JSON Schema 输出，参见 [OpenAI 官方结构化输出说明](https://developers.openai.com/api/docs/guides/structured-outputs)。没有 SDK、新依赖、工具调用、重试、路由或自动回退。
+
+在当前进程已安全配置 `OPENAI_API_KEY` 的前提下，PowerShell 启动方式如下。将模型占位符替换为账户可用且支持 Structured Outputs 的模型 ID；不在代码中固定模型：
+
+```powershell
+$env:MR_MONEYBAGS_SEMANTIC_MODE = "model"
+$env:MR_MONEYBAGS_SEMANTIC_MODEL = "<your-enabled-structured-output-model>"
+python -m mr_moneybags
+```
+
+只从进程环境取得凭据；不读取 `.env`，不打印密钥，不修改全局凭据配置。缺少密钥或模型名会返回 `ConfigurationFailure`，不会发起请求。显式模型模式会将有界用户话轮发送到 OpenAI；不要提交敏感任务内容。每次调用上限 6000 输出 token、30 秒网络超时、1 MiB HTTP 响应，设置 `store=false`，不跟随重定向。
+
+恢复离线确定性模式：
+
+```powershell
+$env:MR_MONEYBAGS_SEMANTIC_MODE = "deterministic"
+python -m mr_moneybags
+```
+
+应用层可以注入 `main(interpreter=ModelBackedSemanticInterpreter(client))`；`client` 只需实现 `SemanticModelClient.interpret(SemanticModelRequest) -> SemanticModelResponse`。返回内容是现有 SemanticResult 的严格 JSON 表示，经过本地结构及证据验证后才进入 CurrentIntent。模型名、密钥和 HTTP 协议仅存在于配置/提供方层。
+
+Semantic Interpreter consumes Semantic Context, not full Project Context。请求只含当前 user 原文及 ID、最多 4 个紧邻此前话轮、可选紧凑意图摘要和默认空的项目事实。当前话轮最多 8000 字符，此前每轮最多 4000；超限直接 `ContextFailure`，不截断原始证据。摘要目标最多 240 字符，其余每组最多 8 项、每项 240 字符；事实最多 8 项、每项内容 512 字符、来源 240 字符。摘要和事实裁剪后只作参考，不是完整状态或 Human evidence。不传整份文档、文件树、Git 历史、工具日志或 ProjectContext。
+
+每项声明及歧义必须引用已发送 user 话轮的 `turn_id/start/end/quote`。本地检查 Python Unicode 字符片段完全相等；拒绝 JIA、窗口外话轮、项目事实、伪造引用、未定义字段、扩大委派和同概念当前/未来冲突。不自动修复。结构与引用有效仅代表有来源的 Derived Interpretation，不能证明模型解释忠实；语义遗漏、换概念 ID 或有引用的错误推断仍需真实 Shadow Evaluation。
+
+`TransportFailure` 表示连接、超时或 HTTP 错误；`ModelOutputFailure` 表示拒绝、不完整/无效结构或语义契约冲突；`EvidenceValidationFailure` 表示证据不符。CLI 输出类别、安全错误码和原话轮后退出 1，不更新 CurrentIntent，不创建规格/计划/工作包，也不回退到确定性规则。提供方响应体、密钥、隐藏指令和原始异常信息不会被打印。
+
+最小多轮修订仅在应用接口支持：将已有 `CurrentIntent` 作为解释器的 `current_intent` 参数，再用包含新 user 话轮的 conversation 调用 `interpret_conversation`。有效结果形成新快照；`build_intent_specification(alignment, previous=old_specification)` 使用原有版本替代机制。旧快照/原话轮不变，不引入记忆或 CLI 循环；超出窗口的原文不能被引用，摘要不能补作证据。
+
+测试替身覆盖五类 Shadow 场景及改写，但不是真实自然语言质量评估。真实 smoke 可按上述模型模式输入一条任务；本阶段环境未配置凭据和模型，未进行 live smoke。Phase 6 必须等待独立的真实 Shadow Evaluation 和明确授权。
 
 ## Workspace Observation
 
@@ -157,7 +192,7 @@ DeterministicInterpreter 仅将既有 IntentExtractor 的单轮结果转换为 S
 - 声明仍标记 Derived Intent / Interpretation、CANDIDATE；confidence=0.5 仅为兼容标记，不是模型概率，也不决定就绪。接口不接受模型生成的执行授权或隐式工作假设；原检测器的安全假设仍独立保留。
 - 测试替身仅在测试内注入结构化结果，不按输入句子查表。原句和改写案例验证 README/认证保护、普通实现委派、作业当前与未来分离、导出阻塞、重构和固定目标改名。
 
-**限制：**运行时现已经过语义契约，但默认确定性解释器仍有限。引用匹配只证明证据存在，不证明语义蕴含，也无法识别被错误赋予不同 concept_id 的同义内容。未接入真实语义模型，复杂中文理解没有因此自动提升；fixture 和运行时集成测试通过不等于真实 Shadow Evaluation 已通过。语义入口只生成候选快照，不实现语义确认对话或决策历史管理。模型驱动理解仍为未来工作，Phase 6 保持暂停。
+**限制：**默认确定性解释器仍有限；模型实现可用不等于质量已验证。引用匹配只证明证据存在，不证明语义蕴含，也无法识别被错误赋予不同 concept_id 的同义内容。fixture 和运行时集成测试通过不等于真实 Shadow Evaluation 已通过。语义入口只生成候选快照，不实现语义确认对话或决策历史管理。真实模型质量验收仍待后续进行，Phase 6 保持暂停。
 
 成功路径不增加输出段落，不展示供应商/模型内部信息；失败路径单独显示结构化解释错误。隐藏新增元数据的空值。现有 CLI JSON 仍偏多，后续人类可读输出设计见 TODO，本阶段不实现 Reporter。
 
@@ -204,6 +239,13 @@ mr_moneybags/
     models.py     # 语义声明与歧义契约
     interpreter.py # 解释器接口、证据验证与既有管线适配
     default.py    # 原确定性提取器的语义契约适配
+    context.py    # 有界语义上下文
+    model.py      # 模型无关客户端契约与解释器
+    schema.py     # 严格输出结构与解析
+    failures.py   # 安全错误类别
+  providers/
+    openai.py     # 唯一薄 HTTP 适配器
+  runtime.py      # 显式解释器配置
   specification/
     __init__.py
     models.py     # 不可变规格、决策、阻塞原因和就绪结果
@@ -227,6 +269,8 @@ tests/
   test_planning.py
   test_semantic.py
   test_semantic_runtime.py
+  test_model_semantic.py
+  test_semantic_provider.py
 pyproject.toml
 PROJECT.md
 TODO.md

@@ -15,7 +15,7 @@ class StartupTest(unittest.TestCase):
             capture_output=True,
             text=True,
             encoding="utf-8",
-            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+            env={**os.environ, "PYTHONIOENCODING": "utf-8", "MR_MONEYBAGS_SEMANTIC_MODE": "deterministic"},
             timeout=10,
         )
 

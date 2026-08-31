@@ -8,7 +8,7 @@
 
 ## 当前阶段
 
-Phase 0–5.5 已完成。Phase 5.5B 将真实运行路径统一为 SemanticInterpreter → 验证 → CurrentIntent → 原 Phase 4/5。默认确定性解释器在契约内部适配原规则，不再由 CLI 绕过语义边界；未接入真实模型。Phase 6 Codex Integration 暂停，等待实际语义理解通过 Shadow Evaluation。
+Phase 0–5.5B 已完成。Phase 5.5C 增加模型实现：有界 SemanticContext → ModelBackedSemanticInterpreter → 提供方无关 SemanticModelClient → 严格结构/证据验证 → CurrentIntent → 原 Phase 4/5。默认确定性解释器保留；模型模式需显式配置。Phase 6 Codex Integration 暂停，等待实际语义理解通过 Shadow Evaluation，接入实现不等于质量验收。
 
 路线图重编号不代表跳过工作：旧 Phase 2A + 2B → 新 Phase 2；旧 Phase 2C → 新 Phase 3；旧 Phase 2D → 新 Phase 4；旧 Phase 2E → 新 Phase 5；旧 Phase 3 → 新 Phase 6。历史提交与实现保持原样。
 
@@ -39,7 +39,7 @@ Phase 0–5.5 已完成。Phase 5.5B 将真实运行路径统一为 SemanticInte
 - 不提交 API Key、Token、Password 或其他 Secret。
 - 外部操作必须有明确授权；不自动执行生产环境操作。
 
-## Phase 5.5B 边界
+## Phase 5.5C 边界
 
 Task 使用标准库 dataclass，ID 使用 UUID4，goal 仅清理首尾空白，原始输入保留，未指定字段为待补充状态，初始状态为 NEW。CLI 与数据模型分离，不模拟智能推理。
 
@@ -71,7 +71,13 @@ planning 是独立纯领域模块。无明确未来考虑时走 FAST_PATH，将�
 
 计划、工作单元与包使用不可变版本快照，替代关系显式记录，历史含义保留。不自动推进阶段，不持久化。
 
-不调用 Codex、LLM 或其他 Agent；不实现 Prompt 序列化、AgentAdapter、执行、监控、Policy/Approval、Verification/Recovery、Stable State、Memory、RAG、Vector Database、MCP、Skills 集成、Multi-Agent、A2A、UI、数据库、后台观察、进度轮询或 ModelRouter。不提前实现 Phase 6。
+Model interprets; domain decides。唯一外部调用为显式选择后的语义模型请求；OpenAI HTTP 适配器位于 providers，模型领域不依赖厂商 API。没有 SDK、新运行依赖、自动路由、重试或回退。
+
+Semantic Interpreter consumes Semantic Context, not full Project Context。当前 user 原文最多 8000 字符，此前最多 4 轮、每轮 4000 字符；超限拒绝而非截断原文。可选摘要每组最多 8 项、每项 240 字符，目标 240 字符；可选项目事实默认空、最多 8 项、内容 512 字符、来源 240 字符。摘要和事实仅作参考，不能冒充 Human 证据；不读取新工作区内容，不发送完整项目上下文。
+
+模型输出复用 SemanticResult；严格拒绝额外字段及缺失结构。只验证发送窗口内的 user 精确片段，不修复引用、不提升信任等级。TransportFailure、ModelOutputFailure、EvidenceValidationFailure 分别表示传输、输出和证据问题；错误保留原话轮并阻止下游构建。模型修订产生新的候选快照，以原有 previous/supersedes 机制保留旧规格，不引入记忆系统。
+
+不调用 Codex 或其他 Agent；不实现 Coding Agent Prompt、AgentAdapter、执行、监控、Policy/Approval、Verification/Recovery、Stable State、Memory、RAG、Vector Database、MCP、Skills 集成、Multi-Agent、A2A、UI、数据库、后台观察、进度轮询或 ModelRouter。不提前实现 Phase 6。
 
 ## 验收与检查点
 
@@ -79,4 +85,4 @@ planning 是独立纯领域模块。无明确未来考虑时走 FAST_PATH，将�
 
 Phase 4/5 领域规则不重构。默认与注入解释器统一经过证据验证；解释失败保留原文并输出结构化错误，不回退到旧路径、不生成可执行规格。默认适配仅支持单用户话轮，证据粒度为完整话轮；不提供通用语义理解。运行时集成测试证明契约已接线，不代替真实 Shadow Evaluation。CLI 内部 JSON 过多仍留待后续交互工作；本阶段不实现 Reporter。
 
-运行全部回归及运行时集成测试；验证默认路径调用语义边界、注入结果改变实际下游状态、保护约束/普通委派/当前未来分离贯穿原管线，错误安全停止。检查安全、Git 差异与状态。全部通过后创建指定本地提交，不 push，停止 Phase 5.5B。
+运行全部回归及运行时集成测试；验证默认路径和模型模式调用同一语义边界、模拟 HTTP/客户端结果改变实际下游状态、保护约束/普通委派/当前未来分离/修订贯穿原管线，错误安全停止。单元测试不访问外部网络。真实模型 smoke 仅在已安全配置环境凭据和模型后运行；本次未配置，未执行，不宣称真实 Shadow Gate 通过。检查安全、Git 差异与状态。全部通过后创建指定本地提交，不 push，停止 Phase 5.5C。

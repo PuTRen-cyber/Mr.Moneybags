@@ -10,6 +10,7 @@ from mr_moneybags.specification.builder import build_intent_specification
 from mr_moneybags.specification.readiness import evaluate_readiness
 from mr_moneybags.planning.planner import Planner
 from mr_moneybags.semantic.interpreter import SemanticInterpreter, SemanticValidationError, interpret_conversation
+from mr_moneybags.runtime import configured_interpreter
 
 
 def _display_dict(value):
@@ -43,10 +44,13 @@ def main(*, interpreter: SemanticInterpreter | None = None) -> int:
     conversation = ProjectConversation()
     conversation.add_turn(Role.USER, task.raw_input)
     try:
+        if interpreter is None:
+            interpreter = configured_interpreter()
         alignment = interpret_conversation(conversation, interpreter)
     except SemanticValidationError as error:
         print('Interpretation Failure:')
-        print(json.dumps({'success': False, 'code': str(error), 'conversation': asdict(conversation)}, ensure_ascii=False))
+        print(json.dumps({'success': False, 'category': getattr(error, 'category', 'SemanticValidationError'),
+                          'code': str(error), 'conversation': asdict(conversation)}, ensure_ascii=False))
         print(f'Semantic interpretation rejected: {error}', file=sys.stderr)
         return 1
     print("Conversation / Intent Alignment:")

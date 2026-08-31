@@ -15,7 +15,8 @@ from test_semantic import claim
 class RuntimeTest(unittest.TestCase):
     def run_cli(self, text, interpreter=None):
         output, error = StringIO(), StringIO()
-        with patch('builtins.input', return_value=text), patch('sys.stdout', output), patch('sys.stderr', error):
+        with patch.dict('os.environ', {'MR_MONEYBAGS_SEMANTIC_MODE': 'deterministic'}), \
+                patch('builtins.input', return_value=text), patch('sys.stdout', output), patch('sys.stderr', error):
             status = main(interpreter=interpreter)
         return status, output.getvalue(), error.getvalue()
 
