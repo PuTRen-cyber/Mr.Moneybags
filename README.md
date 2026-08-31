@@ -4,7 +4,7 @@
 
 **土老板负责目标，小江负责管理，Agent 负责执行。**
 
-当前为 Phase 2B：JIA 接收一条自然语言任务，创建 Task，观察当前工作区，再依据少量项目证据生成可追溯的 Project Context。三个部分分别展示 JSON 后退出。不调用 LLM、Codex 或其他 Agent，不执行任务或文档命令、不持久化、不解释用户意图。
+当前为 Phase 2C：JIA 接收一条自然语言任务，创建 Task，观察工作区、建立 Project Context，再以有限确定性规则分析项目会话与意图对齐。四个部分分别展示 JSON 后退出。不调用 LLM、Codex 或其他 Agent，不执行任务或文档命令、不持久化，不启动聊天循环。
 
 ## 运行
 
@@ -47,7 +47,7 @@ Task 后显示 `Workspace Observation:` 及独立 JSON，数据等级固定为 `
 
 `build_project_context(observation)` 不接收 Task。CLI 在 Observation JSON 后单独显示 `Project Context (Derived Understanding):`。
 
-Observed Evidence 是观察到的证据；Derived Context 是规则产生的解释；User Intent 不在 Phase 2B 范围内。
+Observed Evidence 是观察到的证据；Derived Context 是项目证据的解释；User Intent 由独立的 Phase 2C conversation 模块处理。Context Builder 仍不处理用户意图。
 
 - `ProjectContext` 包含项目名称、声明的摘要、技术、候选入口与测试命令、重要文件、架构说明、假设、来源、Python 版本声明、冲突、警告和实际读取字节数。可信级别固定为 `Derived Context / Interpretation`，不是 Tier 0，也不代表已验证的运行状态。
 - 每条 `DerivedClaim` 保存 `value` 与 `sources`。来源路径关联 `SourceArtifact` 的路径、SHA-256 和完整字节数；不保存完整文件正文。哈希标识本次读取内容，不实现自动过期检测。
@@ -60,6 +60,37 @@ Observed Evidence 是观察到的证据；Derived Context 是规则产生的解�
 - 元数据名称/摘要存在不同声明时，字段为 `null` 并保留全部候选。Python 版本声明的字面值不同会记录冲突及来源；不实现约束求解器，不声称这些声明一定不兼容。缺失信息为 `null` 或 `[]`，架构说明和假设默认留空。
 - README 的 “Tests pass” 或 PROJECT 的“已完成”不产生 `tests_passed`、已完成功能等真实状态。`source_declarations_are_unverified` 提醒这些声明未被验证。无 Git 项目同样可生成有限 Context。
 
+## Conversation / Intent Alignment
+
+CLI 将 Task 原始输入原样放入首个 user 话轮，输出会话证据和独立 AlignmentResult，其中包含 Current Intent、Ambiguities、Assumptions、Questions Required、Alignment State。Task.status 保持独立，既不复制为对齐状态，也不代表执行授权。
+
+- `ProjectConversation` 可追加 user/jia 话轮，保留 UUID、顺序和原始文本。`ConversationTurn` 与派生 `IntentStatement` 不可变；后续解释通过 `supersedes` 引用旧解释，不删除历史证据。
+- `IntentExtractor` 识别有限中英文模式：I want / I need / 我想、must / 必须、do not / should not / 不要、I prefer、以后、include / exclude、expected outcome，以及显式格式说明。未知文本仅作为低置信度目标候选，不模拟完整 NLP；同轮多个目标合并表达，不分解任务。
+- 每条解释、歧义和假设保留 `source_turn_ids`。解释标注 `Derived Intent / Interpretation`，与原始话轮证据分开。confidence 为固定规则标记（0.8 命中规则、0.5 原句候选），不是已验证概率。
+- `CurrentIntent` 包含目标、预期结果、约束、偏好、范围内/外、行为要求、未来考虑、假设、待确认问题、来源、revision 和状态。项目技术声明不自动成为用户偏好；ProjectContext 不传给意图解析器。Ambiguity 的 `context_sources` 可表达项目证据冲突，但本阶段不自动推理这类冲突。
+- 确定性歧义检测覆盖未指定导出格式、模糊视觉方向、内部重构、破坏性数据操作、少量技术权衡以及意图替代。候选解释不是选定需求；不为导出发明默认格式，不用无关偏好消除视觉问题。
+
+决策归属和对齐门槛：歧义本身不意味着打断用户。
+
+| 情况 | 是否要求确认 |
+| --- | --- |
+| USER：用户可见行为、范围、视觉方向、破坏性行为；MEDIUM/HIGH | 是 |
+| JIA_AGENT：私有命名、内部组织、普通重构；LOW/MEDIUM | 通常否；涉及不可逆或高影响假设时要求确认 |
+| SHARED：影响成本、安全、性能等技术权衡；HIGH | 是 |
+| SHARED + MEDIUM | 无安全假设时要求确认 |
+| LOW 且可逆的普通问题 | 不因缺信息自动提问 |
+
+只采用低于门槛、LOW、可逆、ACTIVE 的显式假设。普通内部重构可假设“自行选择私有命名和组织方式，保持可观察行为”，并说明理由；明确要求改变行为时不套用该假设。假设仍是 ACTIVE，不是用户确认。领域枚举预留 SUPERSEDED/DEFERRED 等状态，不实现完整决策历史或自动延后机制。
+
+对齐状态为 DRAFT / ALIGNING / CONFIRMED。无阻塞问题并不自动成为 CONFIRMED。展示 CurrentIntent 后，调用 `conversation.request_confirmation(current_intent)` 记录绑定 revision 的 JIA 确认请求，再追加用户回复。
+
+- 只识别完整受控回复：yes、correct、confirmed、continue、that's right、对、是、没问题、确认、继续；拒绝为 no、not correct、不对、不是、不要。首尾空白和简单句末句号/感叹号可忽略，不解释情绪。
+- 无绑定请求、旧版本请求、普通继续发言都不能确认当前意图。含糊回复保持 ALIGNING，使待确认请求失效；需要重新展示和请求确认。
+- “yes”只能确认已展示且已明确的理解；不能替用户选择未知导出格式。破坏性操作和方向替代需显式确认，确认仅改变对齐状态，不执行、不授权操作。
+- 拒绝使理解继续 ALIGNING，相关假设标记 REJECTED；新增实质内容使旧确认失效。新目标或明确更正可替代旧解释，双方来源保留，方向变化要求确认。
+
+不实现 LLM、Prompt、Task Decomposition、Planner、Policy/Approval、Agent 执行、持久化、后台监听或 UI。CLI 仅展示所需问题的结构化 topic/reason/priority，不生成 AI 问句，也不追问输入。Phase 2D 尚未实现。
+
 ## 测试
 
 ```powershell
@@ -70,6 +101,8 @@ python -m unittest discover -s tests -v
 
 Context 测试覆盖规则与来源、冲突、缺失文件、模型分离、文件数量及字节预算、敏感/二进制过滤、链接和文件替换、无写入与不执行命令。
 
+Conversation 测试覆盖多轮原文、解释来源、决策归属、门槛、安全假设、版本绑定确认、拒绝与含糊回复、历史替代、项目/意图分离以及不对实现细节过度提问。
+
 ## 目录
 
 ```text
@@ -79,6 +112,12 @@ mr_moneybags/
   cli.py          # 单次输入与 JSON 展示
   task.py         # 独立 Task 数据模型
   observation.py  # 只读工作区直接证据
+  conversation/
+    __init__.py
+    models.py     # 会话、解释、歧义、假设与状态
+    extractor.py  # 有限规则提取与受控确认信号
+    ambiguity.py  # 有限歧义检测与归属
+    alignment.py  # 门槛、替代关系与对齐状态
   adapters/       # Agent Adapter，预留
   context/
     __init__.py
@@ -93,6 +132,7 @@ tests/
   test_task.py
   test_observation.py
   test_project_context.py
+  test_conversation.py
 pyproject.toml
 PROJECT.md
 TODO.md
