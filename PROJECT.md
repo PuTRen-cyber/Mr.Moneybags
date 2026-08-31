@@ -8,7 +8,24 @@
 
 ## 当前阶段
 
-Phase 0–2B 已完成。Phase 2C 新增独立项目会话、有限意图提取、歧义检测、决策归属和对齐门槛。只验证确定性领域链路，不实现任务执行、完整自然语言理解或持久化。
+按 v5.0 新路线图，Phase 0–3 已完成，Phase 4 新增 Intent Specification & Task Readiness。规格是可追溯、不可变、带版本的工程意图快照；就绪评估只判断是否可进入 Phase 5，不执行分解、规划或任务。
+
+路线图重编号不代表跳过工作：旧 Phase 2A + 2B → 新 Phase 2；旧 Phase 2C → 新 Phase 3；旧 Phase 2D → 新 Phase 4；旧 Phase 2E → 新 Phase 5；旧 Phase 3 → 新 Phase 6。历史提交与实现保持原样。
+
+| 阶段 | 定位 |
+| --- | --- |
+| Phase 0 | Foundation |
+| Phase 1 | Task Intake |
+| Phase 2 | Project Understanding |
+| Phase 3 | Human Intent & Alignment |
+| Phase 4 | Intent Specification & Task Readiness |
+| Phase 5 | Task Decomposition & Agent Task Package |
+| Phase 6 | Codex Integration |
+| Phase 7 | Execution Governance |
+| Phase 8 | Verification & Stable State |
+| Phase 9 | Recovery & Escalation |
+| Phase 10 | Checkpoint Review & Reporting |
+| Phase 11 | Integrated MVP |
 
 采用 Python 3.11+、标准库命令行入口和 unittest。选择普通 Python 包布局，直接在根目录运行；不引入应用框架或运行依赖。context 保持 Phase 2B 的数据模型、证据读取和确定性推导；其他预留模块保持空白。
 
@@ -22,7 +39,7 @@ Phase 0–2B 已完成。Phase 2C 新增独立项目会话、有限意图提取�
 - 不提交 API Key、Token、Password 或其他 Secret。
 - 外部操作必须有明确授权；不自动执行生产环境操作。
 
-## Phase 2C 边界
+## Phase 4 边界
 
 Task 使用标准库 dataclass，ID 使用 UUID4，goal 仅清理首尾空白，原始输入保留，未指定字段为待补充状态，初始状态为 NEW。CLI 与数据模型分离，不模拟智能推理。
 
@@ -40,8 +57,14 @@ Conversation 原样保存多轮证据；IntentStatement、Ambiguity、Assumption
 
 CONFIRMED 必须来自绑定当前 revision 的 JIA 确认请求及完整受控肯定回复，且没有未解决的实质问题。含糊回复、拒绝、旧版本确认和普通继续发言都不会自动确认。该状态不是执行许可；本阶段没有执行器。
 
-不调用 Codex、LLM 或其他 Agent；不实现 Prompt、Agent Task Package、Task Decomposition、Planner、Policy/Approval、Verification/Recovery、Stable State、Context Staleness、Memory、RAG、Vector Database、MCP、Skills 集成、Multi-Agent、A2A、UI、数据库、后台观察、事件监听或 ModelRouter。不提前实现 Phase 2D/2E/3。
+Task 是原始接收层；CurrentIntent 是活动解释；IntentSpecification 是独立版本快照。ProjectContext 不制造用户意图。声明、话轮、确认、假设和阻塞项的来源均保留，假设不自动变成已确认决策。
+
+UNKNOWN != AMBIGUOUS != BLOCKING。就绪取决于目标、实质歧义、决策归属、可逆性和必要确认，不取决于 confidence 阈值或字段齐全。安全内部细节不阻塞，破坏性操作未确认则阻塞。READY 只允许进入后续规划阶段，不替代未来执行审批。
+
+快照通过显式版本关联替代旧规格，历史对象不被改变；不自动识别语义变化，不持久化。有限冲突检查仅覆盖活动认证行为冲突与同名范围包含/排除，不实现通用语义推理。
+
+不调用 Codex、LLM 或其他 Agent；不实现 Prompt、Agent Task Package、Execution Contract、Task Decomposition、Planner、Policy/Approval、Verification/Recovery、Stable State、Context Staleness、Memory、RAG、Vector Database、MCP、Skills 集成、Multi-Agent、A2A、UI、数据库、后台观察、事件监听或 ModelRouter。不提前实现新 Phase 5 及以后功能。
 
 ## 验收与检查点
 
-运行全部测试及导出、内部重构、破坏性数据操作三个真实 CLI 示例。分别检查证据、项目解释和意图对齐；确认不过度提问、不发明默认需求、不执行操作、不新增依赖，并检查读取安全、工作区变化、Git 差异与状态。全部通过后创建指定本地提交，不 push，停止 Phase 2C。
+运行全部测试及导出、内部重构、破坏性数据操作三个真实 CLI 示例。检查证据、项目解释、意图对齐、规格及就绪结果；确认不过度提问、不发明默认需求、不执行操作、不新增依赖，并检查读取安全、工作区变化、Git 差异与状态。全部通过后创建指定本地提交，不 push，停止 Phase 4。

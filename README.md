@@ -4,7 +4,9 @@
 
 **土老板负责目标，小江负责管理，Agent 负责执行。**
 
-当前为 Phase 2C：JIA 接收一条自然语言任务，创建 Task，观察工作区、建立 Project Context，再以有限确定性规则分析项目会话与意图对齐。四个部分分别展示 JSON 后退出。不调用 LLM、Codex 或其他 Agent，不执行任务或文档命令、不持久化，不启动聊天循环。
+当前为 Phase 4 — Intent Specification & Task Readiness：JIA 接收一条自然语言任务，创建 Task，观察工作区、建立 Project Context，分析项目会话与意图对齐，再生成规格快照及就绪结果。五个部分分别展示 JSON 后退出。不调用 LLM、Codex 或其他 Agent，不执行任务或文档命令、不持久化，不启动聊天循环。
+
+v5.0 路线图已重编号：旧 Phase 2A/2B 合并为新 Phase 2，旧 Phase 2C 对应新 Phase 3，旧 Phase 2D 对应本阶段 Phase 4。没有跳过阶段，也没有重写已接受实现或 Git 历史。完整路线图见 PROJECT.md。
 
 ## 运行
 
@@ -47,7 +49,7 @@ Task 后显示 `Workspace Observation:` 及独立 JSON，数据等级固定为 `
 
 `build_project_context(observation)` 不接收 Task。CLI 在 Observation JSON 后单独显示 `Project Context (Derived Understanding):`。
 
-Observed Evidence 是观察到的证据；Derived Context 是项目证据的解释；User Intent 由独立的 Phase 2C conversation 模块处理。Context Builder 仍不处理用户意图。
+Observed Evidence 是观察到的证据；Derived Context 是项目证据的解释；User Intent 由独立的 Phase 3（旧 Phase 2C）conversation 模块处理。Context Builder 仍不处理用户意图。
 
 - `ProjectContext` 包含项目名称、声明的摘要、技术、候选入口与测试命令、重要文件、架构说明、假设、来源、Python 版本声明、冲突、警告和实际读取字节数。可信级别固定为 `Derived Context / Interpretation`，不是 Tier 0，也不代表已验证的运行状态。
 - 每条 `DerivedClaim` 保存 `value` 与 `sources`。来源路径关联 `SourceArtifact` 的路径、SHA-256 和完整字节数；不保存完整文件正文。哈希标识本次读取内容，不实现自动过期检测。
@@ -89,7 +91,29 @@ CLI 将 Task 原始输入原样放入首个 user 话轮，输出会话证据和�
 - “yes”只能确认已展示且已明确的理解；不能替用户选择未知导出格式。破坏性操作和方向替代需显式确认，确认仅改变对齐状态，不执行、不授权操作。
 - 拒绝使理解继续 ALIGNING，相关假设标记 REJECTED；新增实质内容使旧确认失效。新目标或明确更正可替代旧解释，双方来源保留，方向变化要求确认。
 
-不实现 LLM、Prompt、Task Decomposition、Planner、Policy/Approval、Agent 执行、持久化、后台监听或 UI。CLI 仅展示所需问题的结构化 topic/reason/priority，不生成 AI 问句，也不追问输入。Phase 2D 尚未实现。
+不实现 LLM、Prompt、Task Decomposition、Planner、Policy/Approval、Agent 执行、持久化、后台监听或 UI。CLI 仅展示所需问题的结构化 topic/reason/priority，不生成 AI 问句，也不追问输入。
+
+## Intent Specification / Readiness
+
+`build_intent_specification(alignment, previous=None)` 从 AlignmentResult 的 CurrentIntent 建立不可变规格，`evaluate_readiness(specification)` 独立返回 READY / NOT_READY、阻塞原因、非阻塞未知项及生效假设。两者均为无文件、命令或网络操作的纯领域逻辑。
+
+- `IntentSpecification` 保留目标、预期结果、范围、行为要求、约束、偏好、未来考虑、用户决策、工作假设、问题、阻塞项、来源、版本和状态；可信级别为 `Derived Intent Specification / Interpretation`。未知字段保持空，不填充技术方案。
+- 用户决策保存原 IntentStatement（包含声明 ID、原话轮来源及解释标识）和单独的确认话轮 ID。工作假设保留 Assumption ID、理由、可逆性、影响与状态；即使已确认也保留假设来源，不冒充原始用户声明。未确认的候选决策不声称已获确认。
+- `source_intent_version` 引用 CurrentIntent.revision；阻塞原因关联声明、话轮、歧义或假设 ID。构建器直接消费现有领域结果，不重新理解对话，也不接收 Task 或 ProjectContext 来制造意图。
+- 有意义目标且无实质阻塞即可 READY，无须所有字段完整或所有意图都是 CONFIRMED；不以 confidence 数值决定就绪。空文本、纯标点及少量明确无意义短语会被阻塞，这不是通用语义判断。
+- 未解决的必要问题、重要用户选择、高影响共享决策、未确认破坏性操作、未解决方向冲突均阻塞。HIGH 问题不能仅靠 DEFERRED 绕过。低影响内部未知项保留但不阻塞；只有门槛以下 LOW、可逆的工作假设可以生效。
+- 额外矛盾检查刻意有限：活动认证行为保留约束与认证替换要求冲突、相同范围项同时包含/排除。已有 Phase 3 supersedes/resolution 会被保留；不会无条件采用最新声明覆盖其他仍生效约束，不声称理解任意自然语言矛盾。
+- Builder 返回 BLOCKED 或 READY 快照；DRAFT 表示尚未评估的规格。冻结 dataclass 和 tuple 防止 CurrentIntent 后续修改影响快照。同一输入的 ID/序列化稳定；显式传入 previous 时建立下一版本并记录 supersedes，不自动判断语义变化。
+- `supersede_specification(old, new)` 返回标记 SUPERSEDED、保留原含义的历史副本，并关联新 ID；不原地改变旧对象，不删除历史。调用方保留这些内存快照；本阶段无持久化或自动监听。就绪评估拒绝已被替代的历史副本。
+- READY 仅表示可进入后续工程分解，不是执行授权。有效且绑定当前意图版本的确认可解除破坏性请求的 Phase 4 阻塞，但未来执行时仍可能需要审批。本阶段不进行分解、规划或执行。
+
+真实 CLI 的代表性结果：
+
+| 输入 | 规格 / 就绪结果 |
+| --- | --- |
+| I want to add export functionality. | BLOCKED / NOT_READY；格式待定，不选择 CSV |
+| Refactor the internal authentication helper without changing behavior. | READY；保留行为和显式工作假设，不追问内部命名 |
+| Delete all user data and reset the database. | BLOCKED / NOT_READY；MISSING_REQUIRED_CONFIRMATION |
 
 ## 测试
 
@@ -102,6 +126,8 @@ python -m unittest discover -s tests -v
 Context 测试覆盖规则与来源、冲突、缺失文件、模型分离、文件数量及字节预算、敏感/二进制过滤、链接和文件替换、无写入与不执行命令。
 
 Conversation 测试覆盖多轮原文、解释来源、决策归属、门槛、安全假设、版本绑定确认、拒绝与含糊回复、历史替代、项目/意图分离以及不对实现细节过度提问。
+
+Specification 测试覆盖来源与字段保留、决策/假设分离、实质阻塞、非阻塞未知项、确认有效性、有限矛盾检测、不可变快照、版本替代及无 IO；保留已有 84 项回归测试。
 
 ## 目录
 
@@ -119,6 +145,11 @@ mr_moneybags/
     ambiguity.py  # 有限歧义检测与归属
     alignment.py  # 门槛、替代关系与对齐状态
   adapters/       # Agent Adapter，预留
+  specification/
+    __init__.py
+    models.py     # 不可变规格、决策、阻塞原因和就绪结果
+    builder.py    # 来源保留、快照与版本替代
+    readiness.py  # 确定性就绪规则
   context/
     __init__.py
     models.py     # Derived Claim、Source Artifact、Project Context
@@ -133,6 +164,7 @@ tests/
   test_observation.py
   test_project_context.py
   test_conversation.py
+  test_specification.py
 pyproject.toml
 PROJECT.md
 TODO.md
