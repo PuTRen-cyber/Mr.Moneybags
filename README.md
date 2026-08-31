@@ -4,7 +4,7 @@
 
 **土老板负责目标，小江负责管理，Agent 负责执行。**
 
-当前为 Phase 5 — Rolling Planning, Current Work Unit & Agent Task Package：JIA 接收一条自然语言任务，创建 Task、观察工作区、建立 Project Context、分析会话与意图对齐、生成规格与就绪结果，再对 READY 规格生成滚动规划及工作包。六个部分分别展示 JSON 后退出。不调用 LLM、Codex 或其他 Agent，不执行任务或文档命令、不持久化，不启动聊天循环。
+当前为 Phase 5.5 — Semantic Interpretation Upgrade：在已有 Phase 0–5 管线上新增供应商无关的语义解释契约和验证入口，未接入真实模型。默认 CLI 仍使用原有限规则，六个部分展示 JSON 后退出。不调用 LLM、Codex 或其他 Agent，不执行任务或文档命令、不持久化，不启动聊天循环。
 
 v5.0 路线图已重编号：旧 Phase 2A/2B 合并为新 Phase 2，旧 Phase 2C 对应新 Phase 3，旧 Phase 2D 对应新 Phase 4。没有跳过阶段，也没有重写已接受实现或 Git 历史。完整路线图见 PROJECT.md。
 
@@ -140,6 +140,23 @@ v5.1 原则：JIA 管理意图、阶段和边界，Coding Agent 管理普通实�
 
 Phase 6 仍为 Codex Integration，尚未实现。本阶段无执行、Agent 调用、监控、LLM、Prompt、Policy/Approval、Verification/Recovery、UI 或数据库。
 
+## Semantic Interpretation
+
+`SemanticInterpreter.interpret(turns) -> SemanticResult` 是可注入的供应商无关接口。`interpret_conversation(conversation, interpreter)` 验证结果后生成既有 AlignmentResult / CurrentIntent，继续沿原 Specification → Readiness → Planning → Package 管线流转。也可通过 Python API `cli.main(interpreter=...)` 注入；默认 `python -m mr_moneybags` 不注入模型，保持原规则。本阶段没有模型 SDK、网络调用、句子查表或新增语言规则库。
+
+- `SemanticClaim` 分开表达 goal、expected_outcome、behavior_requirement、constraint、scope_in/out、preference 和 future_consideration；concept_id 关联同一语义对象，禁止同一对象同时标为未来和当前目标/范围/行为/结果。未来与 scope_out 可以并存。
+- 每条声明和语义歧义必须引用 user 话轮的非空原文片段：turn_id、按 Python 字符索引计的 start/end（左闭右开）、quote。验证话轮角色、精确切片、边界、类型、唯一 ID、单一目标/预期结果及最新用户话轮；拒绝伪造引用和过期结果。
+- 验证上限为 64 条声明、32 条歧义、每项 8 个证据片段。验证失败抛出 SemanticValidationError；CLI 显示错误码并停止，不回退成可执行规格。
+- IntentStatement 兼容扩展 evidence、protected_target 和 implementation_delegation；Ambiguity 增加 evidence。旧调用的默认值保持空。受保护目标只能附在 constraint/scope_out，委派只能附在 constraint，唯一支持值是 ordinary_implementation_within_scope_and_constraints。
+- protected_target 表示显式受保护对象；约束内容及证据保留到规格，完整声明通过工作包 user_decisions 传递。普通实现委派不包含删除、发布、push、扩大范围或忽略约束的授权。
+- 语义歧义复用既有归属、影响程度和对齐门槛；保留原歧义检测，普通委派不会消除实质导出选择或高影响用户问题。语义解释不创建 CONFIRMED；结果版本取决于完整语义结果，同一话轮的新解释也会改变 revision。
+- 声明仍标记 Derived Intent / Interpretation、CANDIDATE；confidence=0.5 仅为兼容标记，不是模型概率，也不决定就绪。接口不接受模型生成的执行授权或隐式工作假设；原检测器的安全假设仍独立保留。
+- 测试替身仅在测试内注入结构化结果，不按输入句子查表。原句和改写案例验证 README/认证保护、普通实现委派、作业当前与未来分离、导出阻塞、重构和固定目标改名。
+
+**限制：**引用匹配只证明证据存在，不证明语义蕴含，也无法识别被错误赋予不同 concept_id 的同义内容。未接入真实语义模型，默认 CLI 对复杂中文的理解没有因此自动提升；七类 fixture 通过不等于真实 Shadow Evaluation 已通过。语义入口当前只生成候选快照，不实现语义确认对话或决策历史管理。Phase 6 暂停，等待实际语义能力的 Shadow Evaluation。
+
+不增加输出段落，不展示供应商/模型内部信息；隐藏新增元数据的空值。现有 CLI JSON 仍偏多，后续人类可读输出设计见 TODO，本阶段不实现 Reporter。
+
 ## 测试
 
 ```powershell
@@ -178,6 +195,10 @@ mr_moneybags/
     planner.py    # 有限确定性规划与历史替代
     package.py    # 项目证据摘要与结构化工作包
     briefing.py   # 简洁派发预览
+  semantic/
+    __init__.py
+    models.py     # 语义声明与歧义契约
+    interpreter.py # 解释器接口、证据验证与既有管线适配
   specification/
     __init__.py
     models.py     # 不可变规格、决策、阻塞原因和就绪结果
@@ -199,6 +220,7 @@ tests/
   test_conversation.py
   test_specification.py
   test_planning.py
+  test_semantic.py
 pyproject.toml
 PROJECT.md
 TODO.md

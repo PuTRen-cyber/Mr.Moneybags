@@ -10,9 +10,17 @@ from mr_moneybags.conversation.models import ProjectConversation, Role
 from mr_moneybags.specification.builder import build_intent_specification
 from mr_moneybags.specification.readiness import evaluate_readiness
 from mr_moneybags.planning.planner import Planner
+from mr_moneybags.semantic.interpreter import SemanticInterpreter, SemanticValidationError, interpret_conversation
 
 
-def main() -> int:
+def _display_dict(value):
+    return asdict(value, dict_factory=lambda items: {
+        key: item for key, item in items
+        if not (key in {'evidence', 'protected_target', 'implementation_delegation'} and item in (None, ()))
+    })
+
+
+def main(*, interpreter: SemanticInterpreter | None = None) -> int:
     print("Mr.Moneybags | JIA - Submit one task; no agent execution.")
     try:
         raw_input = input("Task: ")
@@ -35,14 +43,18 @@ def main() -> int:
     print(json.dumps(asdict(context), ensure_ascii=False, indent=2))
     conversation = ProjectConversation()
     conversation.add_turn(Role.USER, task.raw_input)
-    alignment = analyze_conversation(conversation)
+    try:
+        alignment = analyze_conversation(conversation) if interpreter is None else interpret_conversation(conversation, interpreter)
+    except SemanticValidationError as error:
+        print(f'Semantic interpretation rejected: {error}', file=sys.stderr)
+        return 1
     print("Conversation / Intent Alignment:")
     print(json.dumps({"conversation": asdict(conversation),
-                      "alignment": asdict(alignment)}, ensure_ascii=False, indent=2))
+                      "alignment": _display_dict(alignment)}, ensure_ascii=False, indent=2))
     specification = build_intent_specification(alignment)
     print("Intent Specification / Readiness:")
-    print(json.dumps({"specification": asdict(specification),
-                      "readiness": asdict(evaluate_readiness(specification))}, ensure_ascii=False, indent=2))
+    print(json.dumps({"specification": _display_dict(specification),
+                      "readiness": _display_dict(evaluate_readiness(specification))}, ensure_ascii=False, indent=2))
     print("Planning:")
-    print(json.dumps(asdict(Planner().plan(specification, context)), ensure_ascii=False, separators=(',', ':')))
+    print(json.dumps(_display_dict(Planner().plan(specification, context)), ensure_ascii=False, separators=(',', ':')))
     return 0

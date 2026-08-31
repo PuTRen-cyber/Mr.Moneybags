@@ -66,6 +66,18 @@ class ConversationTurn:
 
 
 @dataclass(frozen=True)
+class EvidenceReference:
+    turn_id: str
+    start: int
+    end: int
+    quote: str
+
+
+class ImplementationDelegation(StrEnum):
+    ORDINARY_IMPLEMENTATION = 'ordinary_implementation_within_scope_and_constraints'
+
+
+@dataclass(frozen=True)
 class IntentStatement:
     id: str
     kind: IntentKind
@@ -75,6 +87,9 @@ class IntentStatement:
     status: str = "CANDIDATE"
     supersedes: tuple[str, ...] = ()
     trust_level: str = field(default="Derived Intent / Interpretation", init=False)
+    evidence: tuple[EvidenceReference, ...] = ()
+    protected_target: str | None = None
+    implementation_delegation: ImplementationDelegation | None = None
 
 
 @dataclass(frozen=True)
@@ -101,6 +116,7 @@ class Ambiguity:
     status: AmbiguityStatus = AmbiguityStatus.OPEN
     safe_assumption: Assumption | None = None
     context_sources: tuple[str, ...] = ()
+    evidence: tuple[EvidenceReference, ...] = ()
 
 
 @dataclass(frozen=True)
