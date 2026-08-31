@@ -71,7 +71,7 @@ planning 是独立纯领域模块。无明确未来考虑时走 FAST_PATH，将�
 
 计划、工作单元与包使用不可变版本快照，替代关系显式记录，历史含义保留。不自动推进阶段，不持久化。
 
-Model interprets; domain decides。唯一外部调用为显式选择后的语义模型请求；OpenAI HTTP 适配器位于 providers，模型领域不依赖厂商 API。没有 SDK、新运行依赖、自动路由、重试或回退。
+Model interprets; domain decides。唯一外部调用为显式选择后的语义模型请求；OpenAI 和 DeepSeek HTTP 适配器位于 providers，必须显式指定提供方，模型领域不依赖厂商 API。没有 SDK、新运行依赖、自动路由、重试或回退。
 
 Semantic Interpreter consumes Semantic Context, not full Project Context。当前 user 原文最多 8000 字符，此前最多 4 轮、每轮 4000 字符；超限拒绝而非截断原文。可选摘要每组最多 8 项、每项 240 字符，目标 240 字符；可选项目事实默认空、最多 8 项、内容 512 字符、来源 240 字符。摘要和事实仅作参考，不能冒充 Human 证据；不读取新工作区内容，不发送完整项目上下文。
 

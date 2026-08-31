@@ -37,17 +37,30 @@ Task: 请整理本周工作计划
 
 **Model interprets; domain decides.** 模型只解释输入；READY/BLOCKED、FAST_PATH/ROLLING、当前工作单元和工作包仍由既有领域规则决定。实现完成不代表真实 Shadow Evaluation 已通过，Phase 6 仍暂停。
 
-唯一具体适配器使用标准库调用 OpenAI Responses API，并要求严格 JSON Schema 输出，参见 [OpenAI 官方结构化输出说明](https://developers.openai.com/api/docs/guides/structured-outputs)。没有 SDK、新依赖、工具调用、重试、路由或自动回退。
+适配器均使用标准库。OpenAI 使用 Responses API 的严格 JSON Schema 输出，参见 [OpenAI 官方结构化输出说明](https://developers.openai.com/api/docs/guides/structured-outputs)。DeepSeek 使用 `POST https://api.deepseek.com/chat/completions` 和 `response_format={"type":"json_object"}`，参见 [DeepSeek JSON Output](https://api-docs.deepseek.com/guides/json_mode/)。DeepSeek JSON 模式不保证符合 schema，返回内容仍须通过本地严格结构及证据验证。没有 SDK、新依赖、工具调用、重试或自动回退。
 
 在当前进程已安全配置 `OPENAI_API_KEY` 的前提下，PowerShell 启动方式如下。将模型占位符替换为账户可用且支持 Structured Outputs 的模型 ID；不在代码中固定模型：
 
 ```powershell
 $env:MR_MONEYBAGS_SEMANTIC_MODE = "model"
+$env:MR_MONEYBAGS_SEMANTIC_PROVIDER = "openai"
 $env:MR_MONEYBAGS_SEMANTIC_MODEL = "<your-enabled-structured-output-model>"
 python -m mr_moneybags
 ```
 
-只从进程环境取得凭据；不读取 `.env`，不打印密钥，不修改全局凭据配置。缺少密钥或模型名会返回 `ConfigurationFailure`，不会发起请求。显式模型模式会将有界用户话轮发送到 OpenAI；不要提交敏感任务内容。每次调用上限 6000 输出 token、30 秒网络超时、1 MiB HTTP 响应，设置 `store=false`，不跟随重定向。
+DeepSeek 配置示例（以下只有占位符，实际凭据应安全注入当前进程，避免将密钥写入命令历史）：
+
+```powershell
+$env:MR_MONEYBAGS_SEMANTIC_MODE="model"
+$env:MR_MONEYBAGS_SEMANTIC_PROVIDER="deepseek"
+$env:MR_MONEYBAGS_SEMANTIC_MODEL="<model-name>"
+$env:DEEPSEEK_API_KEY="<secret>"
+python -m mr_moneybags
+```
+
+模型模式必须指定 `MR_MONEYBAGS_SEMANTIC_PROVIDER`：`openai` 仅要求 `OPENAI_API_KEY`，`deepseek` 仅要求 `DEEPSEEK_API_KEY`。二者共用 `MR_MONEYBAGS_SEMANTIC_MODEL`；不根据密钥或模型名推断提供方。缺少/未知提供方、缺少所选密钥或模型名均返回 `ConfigurationFailure`，不会发起请求，也不回退。
+
+只从进程环境取得凭据；不读取 `.env`，不打印密钥，不修改全局凭据配置。显式模型模式会将有界用户话轮发送到所选提供方；不要提交敏感任务内容。每次调用上限 6000 输出 token、30 秒网络超时、1 MiB HTTP 响应，不跟随重定向。OpenAI 请求仍设置 `store=false`；DeepSeek 不发送该非 Chat Completions 参数。
 
 恢复离线确定性模式：
 
@@ -243,8 +256,10 @@ mr_moneybags/
     model.py      # 模型无关客户端契约与解释器
     schema.py     # 严格输出结构与解析
     failures.py   # 安全错误类别
+    prompt.py     # 提供方共享的原语义解释指令
   providers/
-    openai.py     # 唯一薄 HTTP 适配器
+    openai.py     # OpenAI 薄 HTTP 适配器
+    deepseek.py   # DeepSeek 薄 HTTP 适配器
   runtime.py      # 显式解释器配置
   specification/
     __init__.py
@@ -271,6 +286,7 @@ tests/
   test_semantic_runtime.py
   test_model_semantic.py
   test_semantic_provider.py
+  test_deepseek_provider.py
 pyproject.toml
 PROJECT.md
 TODO.md

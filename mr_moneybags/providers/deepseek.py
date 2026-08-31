@@ -5,8 +5,8 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from mr_moneybags.semantic.failures import ModelOutputFailure, TransportFailure
 from mr_moneybags.semantic.model import SemanticModelRequest, SemanticModelResponse
-from mr_moneybags.semantic.schema import RESULT_SCHEMA
 from mr_moneybags.semantic.prompt import INSTRUCTIONS
+from mr_moneybags.semantic.schema import RESULT_SCHEMA
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -17,26 +17,29 @@ class _NoRedirect(HTTPRedirectHandler):
 urlopen = build_opener(_NoRedirect()).open
 
 
-class OpenAISemanticClient:
+class DeepSeekSemanticClient:
     def __init__(self, *, api_key: str, model: str):
         self._api_key = api_key
         self._model = model
 
     def interpret(self, request: SemanticModelRequest) -> SemanticModelResponse:
         payload = {
-            'model': self._model, 'instructions': INSTRUCTIONS,
-            'input': json.dumps(asdict(request.context), ensure_ascii=False),
-            'text': {'format': {'type': 'json_schema', 'name': 'semantic_result',
-                                'strict': True, 'schema': RESULT_SCHEMA}},
-            'store': False, 'max_output_tokens': 6000,
+            'model': self._model,
+            'messages': [
+                {'role': 'system', 'content': INSTRUCTIONS + '\nReturn a JSON object matching this JSON Schema:\n'
+                 + json.dumps(RESULT_SCHEMA)},
+                {'role': 'user', 'content': json.dumps(asdict(request.context), ensure_ascii=False)},
+            ],
+            'response_format': {'type': 'json_object'}, 'stream': False, 'max_tokens': 6000,
         }
-        wire_request = Request('https://api.openai.com/v1/responses',
+        wire_request = Request('https://api.deepseek.com/chat/completions',
             data=json.dumps(payload, ensure_ascii=False).encode('utf-8'),
             headers={'Authorization': 'Bearer ' + self._api_key, 'Content-Type': 'application/json'}, method='POST')
         try:
             with urlopen(wire_request, timeout=30) as response:
                 raw = response.read(1048577)
         except HTTPError as error:
+            error.close()
             raise TransportFailure(f'http_{error.code}') from None
         except TimeoutError:
             raise TransportFailure('request_timeout') from None
@@ -49,26 +52,20 @@ class OpenAISemanticClient:
             raise ModelOutputFailure('provider_response_too_large')
         try:
             data = json.loads(raw)
-            if data['status'] != 'completed':
+            choices = data['choices']
+            if not isinstance(choices, list) or len(choices) != 1:
+                raise ModelOutputFailure('missing_or_multiple_model_outputs')
+            choice = choices[0]
+            if choice['finish_reason'] != 'stop':
                 raise ModelOutputFailure('provider_response_incomplete')
-            texts = []
-            for item in data['output']:
-                if item['type'] == 'reasoning':
-                    continue
-                if item['type'] != 'message':
-                    raise ModelOutputFailure('unexpected_provider_output')
-                if item.get('role') != 'assistant' or item.get('status') != 'completed':
-                    raise ModelOutputFailure('invalid_provider_message')
-                for part in item['content']:
-                    if part['type'] == 'refusal':
-                        raise ModelOutputFailure('model_refused')
-                    if part['type'] != 'output_text' or not isinstance(part['text'], str):
-                        raise ModelOutputFailure('unexpected_provider_content')
-                    texts.append(part['text'])
+            message = choice['message']
+            if message['role'] != 'assistant' or message.get('tool_calls') or message.get('function_call') or message.get('refusal'):
+                raise ModelOutputFailure('unexpected_provider_content')
+            content = message['content']
+            if not isinstance(content, str) or not content.strip():
+                raise ModelOutputFailure('missing_model_output')
         except ModelOutputFailure:
             raise
-        except (ValueError, TypeError, KeyError, RecursionError):
+        except (ValueError, TypeError, KeyError, AttributeError, RecursionError):
             raise ModelOutputFailure('malformed_provider_response') from None
-        if len(texts) != 1:
-            raise ModelOutputFailure('missing_or_multiple_model_outputs')
-        return SemanticModelResponse(texts[0])
+        return SemanticModelResponse(content)

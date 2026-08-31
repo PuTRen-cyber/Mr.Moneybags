@@ -13,10 +13,20 @@ def configured_interpreter(environ: Mapping[str, str] | None = None) -> Semantic
         return DeterministicInterpreter()
     if mode != 'model':
         raise ConfigurationFailure('invalid_semantic_mode')
-    for name in ('OPENAI_API_KEY', 'MR_MONEYBAGS_SEMANTIC_MODEL'):
+    provider = values.get('MR_MONEYBAGS_SEMANTIC_PROVIDER', '')
+    if not provider.strip():
+        raise ConfigurationFailure('missing_MR_MONEYBAGS_SEMANTIC_PROVIDER')
+    if provider not in ('openai', 'deepseek'):
+        raise ConfigurationFailure('invalid_semantic_provider')
+    key_name = 'OPENAI_API_KEY' if provider == 'openai' else 'DEEPSEEK_API_KEY'
+    for name in (key_name, 'MR_MONEYBAGS_SEMANTIC_MODEL'):
         if not values.get(name, '').strip():
             raise ConfigurationFailure('missing_' + name)
-    from mr_moneybags.providers.openai import OpenAISemanticClient
     from mr_moneybags.semantic.model import ModelBackedSemanticInterpreter
-    return ModelBackedSemanticInterpreter(OpenAISemanticClient(
-        api_key=values['OPENAI_API_KEY'], model=values['MR_MONEYBAGS_SEMANTIC_MODEL']))
+    if provider == 'openai':
+        from mr_moneybags.providers.openai import OpenAISemanticClient
+        client = OpenAISemanticClient(api_key=values[key_name], model=values['MR_MONEYBAGS_SEMANTIC_MODEL'])
+    else:
+        from mr_moneybags.providers.deepseek import DeepSeekSemanticClient
+        client = DeepSeekSemanticClient(api_key=values[key_name], model=values['MR_MONEYBAGS_SEMANTIC_MODEL'])
+    return ModelBackedSemanticInterpreter(client)

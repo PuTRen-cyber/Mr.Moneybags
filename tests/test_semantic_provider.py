@@ -83,6 +83,7 @@ class ProviderTest(unittest.TestCase):
         from mr_moneybags.cli import main
         output = StringIO()
         with patch.dict('os.environ', {'MR_MONEYBAGS_SEMANTIC_MODE': 'model',
+                                      'MR_MONEYBAGS_SEMANTIC_PROVIDER': 'openai',
                                       'OPENAI_API_KEY': 'test-only', 'MR_MONEYBAGS_SEMANTIC_MODEL': 'test-model'}, clear=True), \
                 patch('mr_moneybags.providers.openai.urlopen', side_effect=transport) as called, \
                 patch('builtins.input', return_value='Find records.'), patch('sys.stdout', output):
@@ -94,11 +95,13 @@ class ProviderTest(unittest.TestCase):
     def test_configuration_is_explicit_and_missing_key_fails_without_network(self):
         self.assertIsInstance(configured_interpreter({}), DeterministicInterpreter)
         self.assertIsInstance(configured_interpreter({'MR_MONEYBAGS_SEMANTIC_MODE': 'model',
+            'MR_MONEYBAGS_SEMANTIC_PROVIDER': 'openai',
             'OPENAI_API_KEY': 'test-only', 'MR_MONEYBAGS_SEMANTIC_MODEL': 'test-model'}), ModelBackedSemanticInterpreter)
         for values, code in (
             ({'MR_MONEYBAGS_SEMANTIC_MODE': 'invalid'}, 'invalid_semantic_mode'),
-            ({'MR_MONEYBAGS_SEMANTIC_MODE': 'model'}, 'missing_OPENAI_API_KEY'),
-            ({'MR_MONEYBAGS_SEMANTIC_MODE': 'model', 'OPENAI_API_KEY': 'test-only'}, 'missing_MR_MONEYBAGS_SEMANTIC_MODEL'),
+            ({'MR_MONEYBAGS_SEMANTIC_MODE': 'model', 'MR_MONEYBAGS_SEMANTIC_PROVIDER': 'openai'}, 'missing_OPENAI_API_KEY'),
+            ({'MR_MONEYBAGS_SEMANTIC_MODE': 'model', 'MR_MONEYBAGS_SEMANTIC_PROVIDER': 'openai',
+              'OPENAI_API_KEY': 'test-only'}, 'missing_MR_MONEYBAGS_SEMANTIC_MODEL'),
         ):
             with patch('mr_moneybags.providers.openai.urlopen') as network:
                 with self.assertRaisesRegex(ConfigurationFailure, code):
@@ -109,7 +112,7 @@ class ProviderTest(unittest.TestCase):
         from io import StringIO
         from mr_moneybags.cli import main
         output, error = StringIO(), StringIO()
-        with patch.dict('os.environ', {'MR_MONEYBAGS_SEMANTIC_MODE': 'model'}, clear=True), \
+        with patch.dict('os.environ', {'MR_MONEYBAGS_SEMANTIC_MODE': 'model', 'MR_MONEYBAGS_SEMANTIC_PROVIDER': 'openai'}, clear=True), \
                 patch('builtins.input', return_value='Keep raw request.'), patch('sys.stdout', output), patch('sys.stderr', error):
             self.assertEqual(main(), 1)
         self.assertIn('missing_OPENAI_API_KEY', error.getvalue())

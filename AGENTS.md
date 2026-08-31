@@ -11,7 +11,7 @@
 ## 范围
 
 - 项目定位以 PROJECT.md 为准；TODO.md 仅记录后续阶段，不是执行授权。
-- 当前只允许 Phase 5.5C：运行时统一经过 SemanticInterpreter，可显式选择 ModelBackedSemanticInterpreter 和一个薄提供方适配器；原规则仍为离线默认。Phase 6 明确暂停，须待真实 Shadow Evaluation 通过后单独授权；实现测试不代表语义质量门槛通过。
+- 当前只允许 Phase 5.5C：运行时统一经过 SemanticInterpreter，可显式选择 ModelBackedSemanticInterpreter 和 OpenAI 或 DeepSeek 薄提供方适配器；原规则仍为离线默认。Phase 6 明确暂停，须待真实 Shadow Evaluation 通过后单独授权；实现测试不代表语义质量门槛通过。
 - Observed Evidence、Derived Context、User Intent 必须分离。Observation 和 Context Builder 保持原有边界；conversation 保留原文及来源，派生解释标注 Derived Intent / Interpretation，不将项目技术变成用户偏好。
 - 仅在显式模型语义模式调用 LLM；不调用 Codex 或其他 Agent，不生成 Coding Agent Prompt、不实现执行、AgentAdapter、监控、Policy/Approval、Verification/Recovery、Stable State、Context Staleness、Memory、持久化、后台观察、Companion 监听或 ModelRouter。
 - 禁止 Multi-Agent、A2A、MCP 集成、RAG、Vector Database、Cloud Deployment、完整 Web UI、复杂 Memory System、自动化生产环境操作和大规模框架设计。
