@@ -26,7 +26,12 @@ class StartupTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Mr.Moneybags", result.stdout)
         self.assertIn("JIA", result.stdout)
-        task = json.loads(result.stdout[result.stdout.index("{"):])
+        task_output, observation_output = result.stdout.split("Workspace Observation:\n", 1)
+        task = json.loads(task_output[task_output.index("{"):])
+        observation = json.loads(observation_output)
+        self.assertEqual(observation["trust_level"], "Tier 0 — Direct Evidence")
+        self.assertEqual(Path(observation["cwd"]), Path(__file__).resolve().parents[1])
+        self.assertIsInstance(observation["files"], list)
         self.assertEqual(
             set(task),
             {"id", "raw_input", "goal", "expected_outcome", "constraints",

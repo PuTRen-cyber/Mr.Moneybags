@@ -11,8 +11,9 @@
 ## 范围
 
 - 项目定位以 PROJECT.md 为准；TODO.md 仅记录后续阶段，不是执行授权。
-- 当前只允许 Phase 1 JIA CLI 任务接收与结构化展示，不提前实现后续功能。
-- 不调用 Codex、LLM 或其他 Agent，不实现 Context Engine、Policy Engine 或 Verification / Recovery。
+- 当前只允许 Phase 2A：在已有 Task intake 后新增独立的只读 Workspace Observation，不提前实现 Phase 2B 及之后功能。
+- Ground Truth != AI Interpretation；观察等级固定为 Tier 0 — Direct Evidence，不解释 README/PROJECT，不生成 Derived Context，不修改被观察工作区。
+- 不调用 Codex、LLM 或其他 Agent，不实现完整 Context Engine、Context Staleness、Memory、Policy Engine 或 Verification / Recovery。
 - 禁止 Multi-Agent、A2A、MCP 集成、RAG、Vector Database、Cloud Deployment、完整 Web UI、复杂 Memory System、自动化生产环境操作和大规模框架设计。
 - adapters、context、policy、verification、reporter 仅预留目录，不编写假实现。
 
@@ -29,4 +30,4 @@
 - 不加入或输出 API Key、Token、Password、私钥或其他 Secret。
 - 不进行未授权的外部操作或大规模网络搜索。
 - 未获用户明确指令，不执行 git init、git add、git commit；不执行 git push。
-- 本次 Phase 1 请求仅授权验证通过后的一个本地提交，提交信息为 `feat: add JIA task intake CLI`，完成后停止；不构成后续提交授权。
+- 本次 Phase 2A 请求仅授权验证通过后的一个本地项目提交，提交信息为 `feat: add workspace ground truth observation`，完成后停止；不构成后续提交授权。边界测试只在独立临时目录创建 Git fixtures。
