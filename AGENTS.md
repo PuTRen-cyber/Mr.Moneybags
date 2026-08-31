@@ -11,7 +11,8 @@
 ## 范围
 
 - 项目定位以 PROJECT.md 为准；TODO.md 仅记录后续阶段，不是执行授权。
-- 当前只允许 Phase 0 骨架，不提前实现后续功能。
+- 当前只允许 Phase 1 JIA CLI 任务接收与结构化展示，不提前实现后续功能。
+- 不调用 Codex、LLM 或其他 Agent，不实现 Context Engine、Policy Engine 或 Verification / Recovery。
 - 禁止 Multi-Agent、A2A、MCP 集成、RAG、Vector Database、Cloud Deployment、完整 Web UI、复杂 Memory System、自动化生产环境操作和大规模框架设计。
 - adapters、context、policy、verification、reporter 仅预留目录，不编写假实现。
 
@@ -28,4 +29,4 @@
 - 不加入或输出 API Key、Token、Password、私钥或其他 Secret。
 - 不进行未授权的外部操作或大规模网络搜索。
 - 未获用户明确指令，不执行 git init、git add、git commit；不执行 git push。
-- 本次 Bootstrap 请求仅授权验证通过后的一个本地提交，完成后停止；不构成后续提交授权。
+- 本次 Phase 1 请求仅授权验证通过后的一个本地提交，提交信息为 `feat: add JIA task intake CLI`，完成后停止；不构成后续提交授权。

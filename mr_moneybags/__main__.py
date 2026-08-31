@@ -1,6 +1,5 @@
-def main() -> None:
-    print("Mr.Moneybags | JIA | Phase 0: project skeleton ready.")
+from mr_moneybags.cli import main
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

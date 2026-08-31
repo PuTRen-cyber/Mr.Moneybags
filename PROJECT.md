@@ -8,7 +8,7 @@
 
 ## 当前阶段
 
-Phase 0 只建立干净、可运行、可测试、适合长期迭代的 Python 工程骨架，不实现完整产品。
+Phase 0 工程骨架已完成。Phase 1 只建立 JIA CLI 最小闭环：接收一行自然语言任务，创建结构化 Task，展示结果后退出。不实现任务执行或持久化。
 
 采用 Python 3.11+、标准库命令行入口和 unittest。选择普通 Python 包布局，直接在根目录运行；不引入应用框架或运行依赖。五个模块仅预留位置，职责和接口待后续阶段明确。
 
@@ -22,10 +22,12 @@ Phase 0 只建立干净、可运行、可测试、适合长期迭代的 Python �
 - 不提交 API Key、Token、Password 或其他 Secret。
 - 外部操作必须有明确授权；不自动执行生产环境操作。
 
-## Phase 0 边界
+## Phase 1 边界
 
-不实现 Multi-Agent、A2A、MCP 集成、RAG、Vector Database、Cloud Deployment、完整 Web UI、复杂 Memory System、自动化生产环境操作或大规模框架设计。不提前实现 Phase 1 及之后的功能。
+Task 使用标准库 dataclass，ID 使用 UUID4，goal 仅清理首尾空白，原始输入保留，未指定字段为待补充状态，初始状态为 NEW。CLI 与数据模型分离，不模拟智能推理。
+
+不调用 Codex、LLM 或其他 Agent；不实现 Context Engine、Policy Engine、Verification / Recovery、Multi-Agent、A2A、MCP 集成、RAG、Vector Database、Cloud Deployment、完整 Web UI、复杂 Memory System、自动化生产环境操作或大规模框架设计。不提前实现 Phase 2 及之后的功能。
 
 ## 验收与检查点
 
-运行程序、运行测试、检查 Git 状态及差异，并检查意外敏感内容。验证失败必须先修复并重新验证。全部通过后只创建一次本地 Git commit，不 push，停止 Phase 0。
+运行程序和示例任务、运行全部测试、检查 Git 状态及差异，并检查意外敏感内容。验证失败必须先修复并重新验证。全部通过后按本阶段授权创建一次本地 Git commit，不 push，停止 Phase 1。
