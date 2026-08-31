@@ -5,7 +5,6 @@ import sys
 from mr_moneybags.task import Task
 from mr_moneybags.observation import observe_workspace
 from mr_moneybags.context import build_project_context
-from mr_moneybags.conversation.alignment import analyze_conversation
 from mr_moneybags.conversation.models import ProjectConversation, Role
 from mr_moneybags.specification.builder import build_intent_specification
 from mr_moneybags.specification.readiness import evaluate_readiness
@@ -44,8 +43,10 @@ def main(*, interpreter: SemanticInterpreter | None = None) -> int:
     conversation = ProjectConversation()
     conversation.add_turn(Role.USER, task.raw_input)
     try:
-        alignment = analyze_conversation(conversation) if interpreter is None else interpret_conversation(conversation, interpreter)
+        alignment = interpret_conversation(conversation, interpreter)
     except SemanticValidationError as error:
+        print('Interpretation Failure:')
+        print(json.dumps({'success': False, 'code': str(error), 'conversation': asdict(conversation)}, ensure_ascii=False))
         print(f'Semantic interpretation rejected: {error}', file=sys.stderr)
         return 1
     print("Conversation / Intent Alignment:")

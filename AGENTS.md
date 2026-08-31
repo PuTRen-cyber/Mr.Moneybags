@@ -11,7 +11,7 @@
 ## 范围
 
 - 项目定位以 PROJECT.md 为准；TODO.md 仅记录后续阶段，不是执行授权。
-- 当前只允许 Phase 5.5：供应商无关 Semantic Interpretation 契约、证据验证和原管线连接。Phase 6 明确暂停，须待真实 Shadow Evaluation 通过后单独授权；测试替身不代表真实语义能力。保留既有编号映射和实现历史。
+- 当前只允许 Phase 5.5B：运行时统一经过 SemanticInterpreter，原规则仅作为默认兼容实现。CLI 不得直接调用旧解释路径。Phase 6 明确暂停，须待真实 Shadow Evaluation 通过后单独授权；测试替身与默认规则不代表通用语义能力。
 - Observed Evidence、Derived Context、User Intent 必须分离。Observation 和 Context Builder 保持原有边界；conversation 保留原文及来源，派生解释标注 Derived Intent / Interpretation，不将项目技术变成用户偏好。
 - 不调用 Codex、LLM 或其他 Agent，不实现 Prompt 序列化、执行、AgentAdapter、监控、Policy/Approval、Verification/Recovery、Stable State、Context Staleness、Memory、持久化、后台观察、Companion 监听或 ModelRouter。
 - 禁止 Multi-Agent、A2A、MCP 集成、RAG、Vector Database、Cloud Deployment、完整 Web UI、复杂 Memory System、自动化生产环境操作和大规模框架设计。
@@ -37,4 +37,4 @@
 - 不加入或输出 API Key、Token、Password、私钥或其他 Secret。
 - 不进行未授权的外部操作或大规模网络搜索。
 - 未获用户明确指令，不执行 git init、git add、git commit；不执行 git push。
-- 本次 Phase 5.5 请求仅授权验证通过后的一个本地项目提交，提交信息为 `feat: add semantic intent interpretation boundary`，完成后停止；不构成后续提交授权。边界测试只在独立临时目录创建 Git fixtures。
+- 本次 Phase 5.5B 请求仅授权验证通过后的一个本地项目提交，提交信息为 `refactor: route runtime through semantic interpreter`，完成后停止；不构成后续提交授权。边界测试只在独立临时目录创建 Git fixtures。

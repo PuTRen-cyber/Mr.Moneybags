@@ -80,9 +80,17 @@ def validate_semantics(result: SemanticResult, turns: tuple[ConversationTurn, ..
         evidence(item.evidence)
 
 
-def interpret_conversation(conversation: ProjectConversation, interpreter: SemanticInterpreter) -> AlignmentResult:
+def interpret_conversation(conversation: ProjectConversation, interpreter: SemanticInterpreter | None = None) -> AlignmentResult:
+    if interpreter is None:
+        from mr_moneybags.semantic.default import DeterministicInterpreter
+        interpreter = DeterministicInterpreter()
     turns = tuple(conversation.turns)
-    result = interpreter.interpret(turns)
+    try:
+        result = interpreter.interpret(turns)
+    except SemanticValidationError:
+        raise
+    except Exception as error:
+        raise SemanticValidationError('interpreter_failed') from error
     validate_semantics(result, turns)
     revision = str(uuid5(NAMESPACE_URL, json.dumps(asdict(result), sort_keys=True, ensure_ascii=False)))
     statements = [IntentStatement(

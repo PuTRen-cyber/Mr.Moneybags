@@ -8,7 +8,7 @@
 
 ## 当前阶段
 
-Phase 0–5 已完成。Phase 5.5 新增 Semantic Interpretation 边界，以供应商无关接口、带证据的语义结果和验证器连接原 CurrentIntent 管线。未接入真实模型，默认 CLI 仍用既有规则；Phase 6 Codex Integration 暂停，等待 Shadow Evaluation 通过。
+Phase 0–5.5 已完成。Phase 5.5B 将真实运行路径统一为 SemanticInterpreter → 验证 → CurrentIntent → 原 Phase 4/5。默认确定性解释器在契约内部适配原规则，不再由 CLI 绕过语义边界；未接入真实模型。Phase 6 Codex Integration 暂停，等待实际语义理解通过 Shadow Evaluation。
 
 路线图重编号不代表跳过工作：旧 Phase 2A + 2B → 新 Phase 2；旧 Phase 2C → 新 Phase 3；旧 Phase 2D → 新 Phase 4；旧 Phase 2E → 新 Phase 5；旧 Phase 3 → 新 Phase 6。历史提交与实现保持原样。
 
@@ -39,7 +39,7 @@ Phase 0–5 已完成。Phase 5.5 新增 Semantic Interpretation 边界，以供
 - 不提交 API Key、Token、Password 或其他 Secret。
 - 外部操作必须有明确授权；不自动执行生产环境操作。
 
-## Phase 5.5 边界
+## Phase 5.5B 边界
 
 Task 使用标准库 dataclass，ID 使用 UUID4，goal 仅清理首尾空白，原始输入保留，未指定字段为待补充状态，初始状态为 NEW。CLI 与数据模型分离，不模拟智能推理。
 
@@ -77,6 +77,6 @@ planning 是独立纯领域模块。无明确未来考虑时走 FAST_PATH，将�
 
 语义层区分当前目标/范围、未来考虑、受保护约束、普通实现委派和实质歧义。每项解释关联 user 原文片段，解释不是引用本身；引用验证不能证明解释忠实。未来内容不进入当前工作单元及验收条件；普通实现委派不授权破坏性操作、发布、push 或扩展产品范围。
 
-仅对 IntentStatement/Ambiguity 增加兼容元数据，Phase 4/5 领域规则不重构。测试替身与改写案例证明语义契约可用，不声称真实自然语言能力已通过评估。CLI 内部 JSON 过多的发现保留到后续人类可读交互工作；本阶段不实现 Reporter。
+Phase 4/5 领域规则不重构。默认与注入解释器统一经过证据验证；解释失败保留原文并输出结构化错误，不回退到旧路径、不生成可执行规格。默认适配仅支持单用户话轮，证据粒度为完整话轮；不提供通用语义理解。运行时集成测试证明契约已接线，不代替真实 Shadow Evaluation。CLI 内部 JSON 过多仍留待后续交互工作；本阶段不实现 Reporter。
 
-运行全部回归测试、七类 Shadow 语义契约场景及改写案例；验证引用、保护约束、普通委派和当前/未来分离能够贯穿原管线。确认不执行操作、不新增依赖，并检查安全、Git 差异与状态。全部通过后创建指定本地提交，不 push，停止 Phase 5.5。
+运行全部回归及运行时集成测试；验证默认路径调用语义边界、注入结果改变实际下游状态、保护约束/普通委派/当前未来分离贯穿原管线，错误安全停止。检查安全、Git 差异与状态。全部通过后创建指定本地提交，不 push，停止 Phase 5.5B。
