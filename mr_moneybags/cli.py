@@ -4,6 +4,7 @@ import sys
 
 from mr_moneybags.task import Task
 from mr_moneybags.observation import observe_workspace
+from mr_moneybags.context import build_project_context
 
 
 def main() -> int:
@@ -21,6 +22,9 @@ def main() -> int:
         return 1
 
     print(json.dumps(asdict(task), ensure_ascii=False, indent=2))
+    observation = observe_workspace()
     print("Workspace Observation:")
-    print(json.dumps(asdict(observe_workspace()), ensure_ascii=False, indent=2))
+    print(json.dumps(asdict(observation), ensure_ascii=False, indent=2))
+    print("Project Context (Derived Understanding):")
+    print(json.dumps(asdict(build_project_context(observation)), ensure_ascii=False, indent=2))
     return 0
