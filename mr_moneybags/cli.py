@@ -9,6 +9,7 @@ from mr_moneybags.conversation.alignment import analyze_conversation
 from mr_moneybags.conversation.models import ProjectConversation, Role
 from mr_moneybags.specification.builder import build_intent_specification
 from mr_moneybags.specification.readiness import evaluate_readiness
+from mr_moneybags.planning.planner import Planner
 
 
 def main() -> int:
@@ -30,7 +31,8 @@ def main() -> int:
     print("Workspace Observation:")
     print(json.dumps(asdict(observation), ensure_ascii=False, indent=2))
     print("Project Context (Derived Understanding):")
-    print(json.dumps(asdict(build_project_context(observation)), ensure_ascii=False, indent=2))
+    context = build_project_context(observation)
+    print(json.dumps(asdict(context), ensure_ascii=False, indent=2))
     conversation = ProjectConversation()
     conversation.add_turn(Role.USER, task.raw_input)
     alignment = analyze_conversation(conversation)
@@ -41,4 +43,6 @@ def main() -> int:
     print("Intent Specification / Readiness:")
     print(json.dumps({"specification": asdict(specification),
                       "readiness": asdict(evaluate_readiness(specification))}, ensure_ascii=False, indent=2))
+    print("Planning:")
+    print(json.dumps(asdict(Planner().plan(specification, context)), ensure_ascii=False, separators=(',', ':')))
     return 0

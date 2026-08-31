@@ -8,7 +8,7 @@
 
 ## 当前阶段
 
-按 v5.0 新路线图，Phase 0–3 已完成，Phase 4 新增 Intent Specification & Task Readiness。规格是可追溯、不可变、带版本的工程意图快照；就绪评估只判断是否可进入 Phase 5，不执行分解、规划或任务。
+Phase 0–4 已完成。按 v5.1 产品方向，Phase 5 新增 Rolling Planning、Current Work Unit、Stage Briefing 和 Agent Task Package。只为 READY 规格建立轻量滚动方向、一个当前有意义工作单元及结构化工作条件，不调用或执行 Agent。
 
 路线图重编号不代表跳过工作：旧 Phase 2A + 2B → 新 Phase 2；旧 Phase 2C → 新 Phase 3；旧 Phase 2D → 新 Phase 4；旧 Phase 2E → 新 Phase 5；旧 Phase 3 → 新 Phase 6。历史提交与实现保持原样。
 
@@ -19,7 +19,7 @@
 | Phase 2 | Project Understanding |
 | Phase 3 | Human Intent & Alignment |
 | Phase 4 | Intent Specification & Task Readiness |
-| Phase 5 | Task Decomposition & Agent Task Package |
+| Phase 5 | Rolling Planning, Current Work Unit & Agent Task Package |
 | Phase 6 | Codex Integration |
 | Phase 7 | Execution Governance |
 | Phase 8 | Verification & Stable State |
@@ -39,7 +39,7 @@
 - 不提交 API Key、Token、Password 或其他 Secret。
 - 外部操作必须有明确授权；不自动执行生产环境操作。
 
-## Phase 4 边界
+## Phase 5 边界
 
 Task 使用标准库 dataclass，ID 使用 UUID4，goal 仅清理首尾空白，原始输入保留，未指定字段为待补充状态，初始状态为 NEW。CLI 与数据模型分离，不模拟智能推理。
 
@@ -63,8 +63,16 @@ UNKNOWN != AMBIGUOUS != BLOCKING。就绪取决于目标、实质歧义、决策
 
 快照通过显式版本关联替代旧规格，历史对象不被改变；不自动识别语义变化，不持久化。有限冲突检查仅覆盖活动认证行为冲突与同名范围包含/排除，不实现通用语义推理。
 
-不调用 Codex、LLM 或其他 Agent；不实现 Prompt、Agent Task Package、Execution Contract、Task Decomposition、Planner、Policy/Approval、Verification/Recovery、Stable State、Context Staleness、Memory、RAG、Vector Database、MCP、Skills 集成、Multi-Agent、A2A、UI、数据库、后台观察、事件监听或 ModelRouter。不提前实现新 Phase 5 及以后功能。
+JIA 管理 WHAT / WHY / 阶段与边界，Coding Agent 管理普通 HOW。轻量指少打断、少重复且复杂度与任务相称。规划不生成完整项目蓝图，也不做贪心任务评分或实现琐事拆分。
+
+planning 是独立纯领域模块。无明确未来考虑时走 FAST_PATH，将当前范围保持为一个可验证成果；明确未来考虑触发 ROLLING，后续方向只是未承诺导航。未来方向最多三个，超出时合并并保留来源。当前范围不会因未来方向而扩大；对无法识别阶段的复杂范围不宣称通用规划能力。
+
+工作包分别保留用户解释、工作假设和项目证据；所有规划规则附来源。已有测试方式可作为验证期待的依据，不变成用户偏好或执行命令。简报仅显示当前目标、理由、范围和完成条件。READY_FOR_DELEGATION 不是已执行或已审批。
+
+计划、工作单元与包使用不可变版本快照，替代关系显式记录，历史含义保留。不自动推进阶段，不持久化。
+
+不调用 Codex、LLM 或其他 Agent；不实现 Prompt 序列化、AgentAdapter、执行、监控、Policy/Approval、Verification/Recovery、Stable State、Memory、RAG、Vector Database、MCP、Skills 集成、Multi-Agent、A2A、UI、数据库、后台观察、进度轮询或 ModelRouter。不提前实现 Phase 6。
 
 ## 验收与检查点
 
-运行全部测试及导出、内部重构、破坏性数据操作三个真实 CLI 示例。检查证据、项目解释、意图对齐、规格及就绪结果；确认不过度提问、不发明默认需求、不执行操作、不新增依赖，并检查读取安全、工作区变化、Git 差异与状态。全部通过后创建指定本地提交，不 push，停止 Phase 4。
+运行全部测试及认证重构、作业能力、阻塞导出、parser 改名四类 CLI/fixture 场景。检查范围是否发明、阶段是否过细、方向是否保留、工作单元是否有意义、工作包是否适合后续交付。确认不执行操作、不新增依赖，并检查安全、工作区变化、Git 差异与状态。全部通过后创建指定本地提交，不 push，停止 Phase 5。

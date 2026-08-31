@@ -4,9 +4,9 @@
 
 **土老板负责目标，小江负责管理，Agent 负责执行。**
 
-当前为 Phase 4 — Intent Specification & Task Readiness：JIA 接收一条自然语言任务，创建 Task，观察工作区、建立 Project Context，分析项目会话与意图对齐，再生成规格快照及就绪结果。五个部分分别展示 JSON 后退出。不调用 LLM、Codex 或其他 Agent，不执行任务或文档命令、不持久化，不启动聊天循环。
+当前为 Phase 5 — Rolling Planning, Current Work Unit & Agent Task Package：JIA 接收一条自然语言任务，创建 Task、观察工作区、建立 Project Context、分析会话与意图对齐、生成规格与就绪结果，再对 READY 规格生成滚动规划及工作包。六个部分分别展示 JSON 后退出。不调用 LLM、Codex 或其他 Agent，不执行任务或文档命令、不持久化，不启动聊天循环。
 
-v5.0 路线图已重编号：旧 Phase 2A/2B 合并为新 Phase 2，旧 Phase 2C 对应新 Phase 3，旧 Phase 2D 对应本阶段 Phase 4。没有跳过阶段，也没有重写已接受实现或 Git 历史。完整路线图见 PROJECT.md。
+v5.0 路线图已重编号：旧 Phase 2A/2B 合并为新 Phase 2，旧 Phase 2C 对应新 Phase 3，旧 Phase 2D 对应新 Phase 4。没有跳过阶段，也没有重写已接受实现或 Git 历史。完整路线图见 PROJECT.md。
 
 ## 运行
 
@@ -91,7 +91,7 @@ CLI 将 Task 原始输入原样放入首个 user 话轮，输出会话证据和�
 - “yes”只能确认已展示且已明确的理解；不能替用户选择未知导出格式。破坏性操作和方向替代需显式确认，确认仅改变对齐状态，不执行、不授权操作。
 - 拒绝使理解继续 ALIGNING，相关假设标记 REJECTED；新增实质内容使旧确认失效。新目标或明确更正可替代旧解释，双方来源保留，方向变化要求确认。
 
-不实现 LLM、Prompt、Task Decomposition、Planner、Policy/Approval、Agent 执行、持久化、后台监听或 UI。CLI 仅展示所需问题的结构化 topic/reason/priority，不生成 AI 问句，也不追问输入。
+会话层不实现 LLM、Prompt、规划、Policy/Approval、Agent 执行、持久化、后台监听或 UI。CLI 仅展示所需问题的结构化 topic/reason/priority，不生成 AI 问句，也不追问输入。
 
 ## Intent Specification / Readiness
 
@@ -105,7 +105,7 @@ CLI 将 Task 原始输入原样放入首个 user 话轮，输出会话证据和�
 - 额外矛盾检查刻意有限：活动认证行为保留约束与认证替换要求冲突、相同范围项同时包含/排除。已有 Phase 3 supersedes/resolution 会被保留；不会无条件采用最新声明覆盖其他仍生效约束，不声称理解任意自然语言矛盾。
 - Builder 返回 BLOCKED 或 READY 快照；DRAFT 表示尚未评估的规格。冻结 dataclass 和 tuple 防止 CurrentIntent 后续修改影响快照。同一输入的 ID/序列化稳定；显式传入 previous 时建立下一版本并记录 supersedes，不自动判断语义变化。
 - `supersede_specification(old, new)` 返回标记 SUPERSEDED、保留原含义的历史副本，并关联新 ID；不原地改变旧对象，不删除历史。调用方保留这些内存快照；本阶段无持久化或自动监听。就绪评估拒绝已被替代的历史副本。
-- READY 仅表示可进入后续工程分解，不是执行授权。有效且绑定当前意图版本的确认可解除破坏性请求的 Phase 4 阻塞，但未来执行时仍可能需要审批。本阶段不进行分解、规划或执行。
+- READY 仅表示可进入后续工程分解，不是执行授权。有效且绑定当前意图版本的确认可解除破坏性请求的 Phase 4 阻塞，但未来执行时仍可能需要审批。规格层不进行分解、规划或执行。
 
 真实 CLI 的代表性结果：
 
@@ -114,6 +114,31 @@ CLI 将 Task 原始输入原样放入首个 user 话轮，输出会话证据和�
 | I want to add export functionality. | BLOCKED / NOT_READY；格式待定，不选择 CSV |
 | Refactor the internal authentication helper without changing behavior. | READY；保留行为和显式工作假设，不追问内部命名 |
 | Delete all user data and reset the database. | BLOCKED / NOT_READY；MISSING_REQUIRED_CONFIRMATION |
+
+## Planning
+
+v5.1 原则：JIA 管理意图、阶段和边界，Coding Agent 管理普通实现决策。轻量意味着少打断、少重复，复杂度与任务相称。
+
+- `Planner.plan(specification, project_context, previous=None)` 返回独立 `PlanningResult`。规格必须为 READY，且重新进行 Phase 4 就绪评估；BLOCKED、DRAFT、SUPERSEDED 或残留阻塞返回结构化失败，不修复需求、不猜导出格式、不生成可委派包。
+- 保守规则将当前已约定范围保持为一个有意义工作单元，不拆成文件、函数、字段或命令。无明确未来考虑时 FAST_PATH；有明确 future_considerations 时 ROLLING。不做通用语义规划，也不假装能自动分离任意多能力请求；需要更细阶段时应先明确规格。
+- `PlanningHorizon` 保留总目标、版本、当前阶段和未来方向。未来最多三个粗略方向；超过三个时将第三项起合并展示，保留全部来源并发出提示。不是固定产生三个阶段，没有未来考虑就不生成未来阶段。
+- `PlanStage` 保留目标、范围摘要、选择理由和来源。未来方向标为 FUTURE、committed=false，无文件清单、命令或实施步骤。未来考虑同时明确排除于当前工作，不把 scope_out 自动提升为未来方向。
+- `CurrentWorkUnit` 包含目标、why_now、范围内外、约束、行为要求、验收条件、验证期待、实现自由度、假设和规格/阶段来源。验收条件由当前目标、预期结果、范围和约束生成符合性检查，标注 planning_rule；不发明数值指标、架构或产品能力。
+- 普通私有命名、内部组织、重构细节及实施顺序交给 Agent，在当前范围和约束内自主决定。保留行为的要求可推导“不新增可见行为或超范围重设计”边界，明确标注规划规则和原声明来源。
+- `AgentTaskPackage` 是与 Agent 无关的结构化工作条件，不是提示词。它复制当前工作单元的条件，分别保留 user_decisions 与 working_assumptions，以及规格、阶段、工作单元和证据来源。READY_FOR_DELEGATION 仅表示包已备妥，不代表委派、执行或审批已经发生。
+- ProjectContext 仅提供单独的派生证据摘要（技术、入口、现有测试方式等）与可用来源哈希；测试命令是未验证证据，不是待执行指令。上下文技术不会变成用户偏好或需求。
+- `StageBriefing` 仅含阶段标题、当前目标、理由、范围内外和完成条件，供用户预览，不混入内部 ID，不是审批系统。
+- 规划与包是 frozen dataclass/tuple 快照，输入和序列化相同则 ID 稳定。显式 superseding 规格可通过 previous 建立下一版本；`supersede_plan(old, new)` 返回保留原内容、标记 SUPERSEDED 的历史副本，不修改旧对象、不自动推进阶段、不持久化。
+- CLI 保留原部分，追加 `Planning:` 紧凑 JSON，包括 horizon、一个 work unit、briefing 和 package；仍为一次输入。作业场景使用测试中的 READY fixture，未扩大既有自然语言提取规则。
+
+| 场景 | 结果 |
+| --- | --- |
+| 认证内部重构，保持行为 | FAST_PATH；一个工作单元，无未来阶段 |
+| 作业创建/查看/课程关联，未来提交和评分 | ROLLING；提交/评分不进入当前范围，不新增通知方向 |
+| 导出格式未定 | success=false；没有工作包 |
+| 内部 parser 改名 | FAST_PATH；无人工路线图 |
+
+Phase 6 仍为 Codex Integration，尚未实现。本阶段无执行、Agent 调用、监控、LLM、Prompt、Policy/Approval、Verification/Recovery、UI 或数据库。
 
 ## 测试
 
@@ -128,6 +153,8 @@ Context 测试覆盖规则与来源、冲突、缺失文件、模型分离、文
 Conversation 测试覆盖多轮原文、解释来源、决策归属、门槛、安全假设、版本绑定确认、拒绝与含糊回复、历史替代、项目/意图分离以及不对实现细节过度提问。
 
 Specification 测试覆盖来源与字段保留、决策/假设分离、实质阻塞、非阻塞未知项、确认有效性、有限矛盾检测、不可变快照、版本替代及无 IO；保留已有 84 项回归测试。
+
+Planning 测试覆盖 READY 门槛、FAST_PATH/ROLLING、当前范围与未来方向分离、实现自由度、工作包/简报、来源、历史替代及无 IO；保留 Phase 0–4 的 115 项回归测试。
 
 ## 目录
 
@@ -145,6 +172,12 @@ mr_moneybags/
     ambiguity.py  # 有限歧义检测与归属
     alignment.py  # 门槛、替代关系与对齐状态
   adapters/       # Agent Adapter，预留
+  planning/
+    __init__.py
+    models.py     # 滚动计划、当前工作单元、工作包与简报
+    planner.py    # 有限确定性规划与历史替代
+    package.py    # 项目证据摘要与结构化工作包
+    briefing.py   # 简洁派发预览
   specification/
     __init__.py
     models.py     # 不可变规格、决策、阻塞原因和就绪结果
@@ -165,6 +198,7 @@ tests/
   test_project_context.py
   test_conversation.py
   test_specification.py
+  test_planning.py
 pyproject.toml
 PROJECT.md
 TODO.md
