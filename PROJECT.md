@@ -39,6 +39,44 @@ Phase 0–5.5C 已完成。Phase 5.5D 增加独立 Task Safety Gate，在未来�
 - 不提交 API Key、Token、Password 或其他 Secret。
 - 外部操作必须有明确授权；不自动执行生产环境操作。
 
+## JIA Operating Model
+
+JIA 不是 Codex 的替代品、代码生成器、自动产品经理或自动规划器。JIA 是人类意图与 Agent 执行之间的协调层：帮助用户将模糊目标逐步转化为可执行方向，并管理项目推进过程中的不确定性和下一步决策。
+
+JIA 负责：
+
+- 理解用户目标。
+- 判断当前是否适合执行。
+- 管理项目阶段。
+- 帮助确定下一步行动。
+- 将明确目标交付给 Agent。
+
+Codex 负责：
+
+- 技术实现。
+- 代码修改。
+- 工程执行。
+- 测试和调试。
+
+Horizon、State、Decision 是未来演进方向，不代表当前已有完整实现：
+
+- Horizon Layer：维护长期目标、可能方向和关键未知因素。它不是详细路线图，也不提前生成完整项目计划。
+- State Layer：维护当前项目阶段。
+- Decision Layer：选择当前最有价值的下一步行动。
+
+JIA 不追求一次性生成完整方案，而是在保持长期方向的同时，通过连续决策推进项目。
+
+现有模块构成 JIA 的可靠性基础：
+
+- Semantic：理解用户表达。
+- Evidence Contract：保证理解结果基于真实用户输入。
+- Safety Gate：防止危险执行。
+- Readiness Gate：判断是否具备进入下一阶段的信息。
+- Router：决定交互路径。
+- Reporter：向用户展示当前状态和结果。
+
+这些模块不改变 JIA 与 Agent 的职责边界，也不代表 Horizon、State、Decision 已完整实现。
+
 ## Phase 5.5C 边界
 
 Task 使用标准库 dataclass，ID 使用 UUID4，goal 仅清理首尾空白，原始输入保留，未指定字段为待补充状态，初始状态为 NEW。CLI 与数据模型分离，不模拟智能推理。
