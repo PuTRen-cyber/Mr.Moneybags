@@ -105,6 +105,58 @@ class ModelRuntimeTest(unittest.TestCase):
             status = main(interpreter=ModelBackedSemanticInterpreter(client), debug=True)
         return status, output.getvalue(), errors.getvalue()
 
+    def test_readme_quick_start_uses_one_goal_with_multiple_requirements(self):
+        text = ('在 README.md 中新增一个简短的 “Development Quick Start” 小节。要求：只修改 README.md；'
+                '说明 Python 要求为 >=3.11；给出启动命令：python -m mr_moneybags；'
+                '给出测试命令：python -m unittest discover -s tests -v；不修改其他现有内容。')
+        def produce(context):
+            turn = context.current_turn
+            return result(context,
+                claim(turn, IntentKind.GOAL, 'Add a Development Quick Start section to README.md.',
+                      '在 README.md 中新增一个简短的 “Development Quick Start” 小节', 'quick-start'),
+                claim(turn, IntentKind.CONSTRAINT, 'Modify only README.md.', '只修改 README.md', 'readme-only'),
+                claim(turn, IntentKind.BEHAVIOR_REQUIREMENT, 'State Python requirement >=3.11.',
+                      '说明 Python 要求为 >=3.11', 'python-requirement'),
+                claim(turn, IntentKind.BEHAVIOR_REQUIREMENT, 'Show python -m mr_moneybags.',
+                      '给出启动命令：python -m mr_moneybags', 'run-command'),
+                claim(turn, IntentKind.BEHAVIOR_REQUIREMENT,
+                      'Show python -m unittest discover -s tests -v.',
+                      '给出测试命令：python -m unittest discover -s tests -v', 'test-command'),
+                claim(turn, IntentKind.CONSTRAINT, 'Preserve all other existing content.',
+                      '不修改其他现有内容', 'preserve-content'))
+        status, output, errors = self.run_cli(text, Client(produce))
+        self.assertEqual(status, 0, errors)
+        plan = json.loads(output.split('Planning:\n')[1])
+        self.assertTrue(plan['success'])
+        package = plan['agent_task_package']
+        self.assertEqual(package['objective']['value'], 'Add a Development Quick Start section to README.md.')
+        self.assertEqual(len(package['constraints']), 2)
+        self.assertEqual(len(package['behavior_requirements']), 3)
+
+    def test_multiple_goal_claims_still_fail(self):
+        def produce(context):
+            turn = context.current_turn
+            return result(context,
+                claim(turn, IntentKind.GOAL, 'Add quick start.', 'Add quick start', 'quick-start'),
+                claim(turn, IntentKind.GOAL, 'Document tests.', 'document tests', 'tests'))
+        with self.assertRaisesRegex(ModelOutputFailure, 'multiple_singleton_claims'):
+            interpret_conversation(conversation('Add quick start and document tests.'),
+                                   ModelBackedSemanticInterpreter(Client(produce)))
+
+    def test_multiple_expected_outcome_claims_still_fail(self):
+        def produce(context):
+            turn = context.current_turn
+            return result(context,
+                claim(turn, IntentKind.GOAL, 'Improve README.', 'Improve README', 'readme'),
+                claim(turn, IntentKind.EXPECTED_OUTCOME, 'Quick start is visible.',
+                      'quick start is visible', 'visible'),
+                claim(turn, IntentKind.EXPECTED_OUTCOME, 'Commands are documented.',
+                      'commands are documented', 'commands'))
+        with self.assertRaisesRegex(ModelOutputFailure, 'multiple_singleton_claims'):
+            interpret_conversation(
+                conversation('Improve README so the quick start is visible and commands are documented.'),
+                ModelBackedSemanticInterpreter(Client(produce)))
+
     def test_protected_constraints_and_paraphrases_reach_package(self):
         for text, boundary, target in (
             ('把 README 安装说明整理清楚，不修改项目代码。', '不修改项目代码', 'project code'),

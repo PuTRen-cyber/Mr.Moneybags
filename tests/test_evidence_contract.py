@@ -99,6 +99,13 @@ class EvidenceContractTest(unittest.TestCase):
         self.assertIn('semantic value', INSTRUCTIONS.lower())
         self.assertIn('quote is not model input', INSTRUCTIONS)
 
+    def test_prompt_makes_singleton_contract_explicit(self):
+        required = ('single highest-level objective', 'at most one goal', 'single overall result',
+                    'at most one expected_outcome', 'must not become multiple goals',
+                    'one goal plus multiple constraints', 'keep one higher-level goal')
+        for phrase in required:
+            self.assertIn(phrase, INSTRUCTIONS.lower())
+
     def test_runtime_diagnostic_identifies_mismatch_without_provider_dump(self):
         raw = '保持空格  和标点。'
         class RuntimeClient:

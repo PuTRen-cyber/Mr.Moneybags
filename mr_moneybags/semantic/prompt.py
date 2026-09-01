@@ -6,6 +6,10 @@ Use the current user turn to revise prior intent. Keep still-applicable constrai
 supplied user evidence; remove replaced current claims. Summaries are compact advisory hints, never evidence.
 Separate current goal, scope and behavior from explicitly deferred future considerations. Use the same
 concept_id for the same concept; do not place a future concept in current goal, outcome, scope or behavior.
+Goal represents the single highest-level objective; return at most one goal. Expected_outcome represents the
+single overall result; return at most one expected_outcome. Multiple requirements, constraints, commands, or
+acceptance criteria must not become multiple goals. Represent composite tasks as one goal plus multiple constraints
+or behavior requirements. When classification is uncertain, keep one higher-level goal instead of splitting it.
 Preserve protected boundaries as constraints with protected_target. Record ordinary implementation delegation
 only when explicit, within the existing scope and constraints; never widen it into execution authority.
 Represent unresolved material user choices as ambiguities instead of selecting an answer. Mere subjective
