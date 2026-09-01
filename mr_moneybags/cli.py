@@ -11,6 +11,7 @@ from mr_moneybags.specification.readiness import evaluate_readiness
 from mr_moneybags.planning.planner import Planner
 from mr_moneybags.reporter import build_codex_brief, build_human_report, format_codex_brief, format_human_report
 from mr_moneybags.readiness import IntentReadinessClassifier, ReadinessStatus
+from mr_moneybags.router import DecisionRouter, TaskMode
 from mr_moneybags.safety import SafetyGate
 from mr_moneybags.semantic.interpreter import SemanticInterpreter, SemanticValidationError, interpret_conversation
 from mr_moneybags.runtime import configured_interpreter
@@ -67,9 +68,15 @@ def main(*, interpreter: SemanticInterpreter | None = None, debug: bool = False)
         print(json.dumps({"conversation": asdict(conversation),
                           "alignment": _display_dict(alignment)}, ensure_ascii=False, indent=2))
     intent_readiness = IntentReadinessClassifier().classify(task.raw_input, alignment.current_intent)
+    router_decision = DecisionRouter().classify(task.raw_input)
     if intent_readiness.status != ReadinessStatus.READY:
         print("Intent Readiness:")
         print(json.dumps(asdict(intent_readiness), ensure_ascii=False, indent=2))
+    if router_decision.mode == TaskMode.DISCOVERY_PATH:
+        print("Intent Router:")
+        print(json.dumps(asdict(router_decision), ensure_ascii=False, indent=2))
+        return 0
+    if intent_readiness.status != ReadinessStatus.READY:
         return 0
     specification = build_intent_specification(alignment)
     readiness = evaluate_readiness(specification)
