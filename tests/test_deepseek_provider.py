@@ -64,9 +64,10 @@ class DeepSeekTest(unittest.TestCase):
         payload = json.loads(request.data)
         self.assertEqual(payload['model'], 'configured-model')
         self.assertEqual(payload['response_format'], {'type': 'json_object'})
+        self.assertEqual(payload['thinking'], {'type': 'disabled'})
         self.assertFalse(payload['stream'])
         self.assertEqual(payload['max_tokens'], 6000)
-        self.assertEqual(network.call_args.kwargs['timeout'], 30)
+        self.assertEqual(network.call_args.kwargs['timeout'], 60)
         self.assertIn(json.dumps(RESULT_SCHEMA), payload['messages'][0]['content'])
         self.assertEqual(json.loads(payload['messages'][1]['content']), json.loads(json.dumps(asdict(self.request.context))))
         self.assertNotIn('tools', payload)
@@ -143,3 +144,25 @@ class DeepSeekTest(unittest.TestCase):
         self.assertEqual(failure['category'], 'EvidenceValidationFailure')
         self.assertEqual(failure['code'], 'quote_mismatch')
         self.assertNotIn('Planning:', output)
+
+    def test_empty_content_fails_closed_without_retry_or_fallback(self):
+        for content in ('', ' ', None):
+            with self.subTest(content=content):
+                status, output, error = self.run_cli(
+                    lambda *a, **k: BytesIO(json.dumps(envelope(content)).encode()))
+                self.assertEqual(status, 1)
+                failure = json.loads(output.split('Interpretation Failure:\n')[1])
+                self.assertEqual(failure['category'], 'ModelOutputFailure')
+                self.assertEqual(failure['code'], 'missing_model_output')
+                self.assertNotIn('Intent Specification / Readiness:', output)
+
+    def test_timeout_fails_closed_without_retry_or_fallback(self):
+        for timeout in (TimeoutError('private detail'), URLError(TimeoutError('private detail'))):
+            with self.subTest(timeout_type=type(timeout).__name__):
+                status, output, error = self.run_cli(timeout)
+                self.assertEqual(status, 1)
+                failure = json.loads(output.split('Interpretation Failure:\n')[1])
+                self.assertEqual(failure['category'], 'TransportFailure')
+                self.assertEqual(failure['code'], 'request_timeout')
+                self.assertNotIn('Intent Specification / Readiness:', output)
+                self.assertNotIn('private detail', output + error)

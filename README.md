@@ -60,7 +60,7 @@ python -m mr_moneybags
 
 模型模式必须指定 `MR_MONEYBAGS_SEMANTIC_PROVIDER`：`openai` 仅要求 `OPENAI_API_KEY`，`deepseek` 仅要求 `DEEPSEEK_API_KEY`。二者共用 `MR_MONEYBAGS_SEMANTIC_MODEL`；不根据密钥或模型名推断提供方。缺少/未知提供方、缺少所选密钥或模型名均返回 `ConfigurationFailure`，不会发起请求，也不回退。
 
-只从进程环境取得凭据；不读取 `.env`，不打印密钥，不修改全局凭据配置。显式模型模式会将有界用户话轮发送到所选提供方；不要提交敏感任务内容。每次调用上限 6000 输出 token、30 秒网络超时、1 MiB HTTP 响应，不跟随重定向。OpenAI 请求仍设置 `store=false`；DeepSeek 不发送该非 Chat Completions 参数。
+只从进程环境取得凭据；不读取 `.env`，不打印密钥，不修改全局凭据配置。显式模型模式会将有界用户话轮发送到所选提供方；不要提交敏感任务内容。每次调用上限 6000 输出 token、1 MiB HTTP 响应，不跟随重定向。OpenAI 保持 30 秒网络超时和 `store=false`；DeepSeek 使用 60 秒网络超时、显式 `thinking.type=disabled`，保留 JSON 输出模式，不发送 `store` 参数，不重试或回退。
 
 恢复离线确定性模式：
 

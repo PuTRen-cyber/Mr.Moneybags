@@ -25,6 +25,7 @@ class DeepSeekSemanticClient:
     def interpret(self, request: SemanticModelRequest) -> SemanticModelResponse:
         payload = {
             'model': self._model,
+            'thinking': {'type': 'disabled'},
             'messages': [
                 {'role': 'system', 'content': INSTRUCTIONS + '\nReturn a JSON object matching this JSON Schema:\n'
                  + json.dumps(RESULT_SCHEMA)},
@@ -36,7 +37,7 @@ class DeepSeekSemanticClient:
             data=json.dumps(payload, ensure_ascii=False).encode('utf-8'),
             headers={'Authorization': 'Bearer ' + self._api_key, 'Content-Type': 'application/json'}, method='POST')
         try:
-            with urlopen(wire_request, timeout=30) as response:
+            with urlopen(wire_request, timeout=60) as response:
                 raw = response.read(1048577)
         except HTTPError as error:
             error.close()
