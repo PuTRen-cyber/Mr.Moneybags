@@ -12,6 +12,10 @@ class ModelOutputFailure(SemanticValidationError):
 class EvidenceValidationFailure(SemanticValidationError):
     category = 'EvidenceValidationFailure'
 
+    def __init__(self, code, diagnostic=None):
+        super().__init__(code)
+        self.diagnostic = diagnostic
+
 
 class ContextFailure(SemanticValidationError):
     category = 'ContextFailure'

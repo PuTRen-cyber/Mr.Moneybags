@@ -49,8 +49,11 @@ def main(*, interpreter: SemanticInterpreter | None = None) -> int:
         alignment = interpret_conversation(conversation, interpreter)
     except SemanticValidationError as error:
         print('Interpretation Failure:')
-        print(json.dumps({'success': False, 'category': getattr(error, 'category', 'SemanticValidationError'),
-                          'code': str(error), 'conversation': asdict(conversation)}, ensure_ascii=False))
+        failure = {'success': False, 'category': getattr(error, 'category', 'SemanticValidationError'),
+                   'code': str(error), 'conversation': asdict(conversation)}
+        if getattr(error, 'diagnostic', None) is not None:
+            failure['diagnostic'] = error.diagnostic
+        print(json.dumps(failure, ensure_ascii=False))
         print(f'Semantic interpretation rejected: {error}', file=sys.stderr)
         return 1
     print("Conversation / Intent Alignment:")
