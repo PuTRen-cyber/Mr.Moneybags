@@ -7,9 +7,9 @@ import unittest
 
 
 class StartupTest(unittest.TestCase):
-    def run_cli(self, user_input):
+    def run_cli(self, user_input, *, debug=False):
         return subprocess.run(
-            [sys.executable, "-m", "mr_moneybags"],
+            [sys.executable, "-m", "mr_moneybags", *(['--debug'] if debug else [])],
             cwd=Path(__file__).resolve().parents[1],
             input=user_input,
             capture_output=True,
@@ -21,7 +21,7 @@ class StartupTest(unittest.TestCase):
 
     def test_module_creates_one_task_and_exits(self):
         raw_input = "  请整理本周工作计划  "
-        result = self.run_cli(raw_input + "\n不要处理第二条任务\n")
+        result = self.run_cli(raw_input + "\n不要处理第二条任务\n", debug=True)
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Mr.Moneybags", result.stdout)
@@ -64,6 +64,15 @@ class StartupTest(unittest.TestCase):
         self.assertIsNone(task["constraints"])
         self.assertIsNone(task["acceptance_criteria"])
         self.assertEqual(result.stderr, "")
+
+    def test_default_output_is_concise(self):
+        result = self.run_cli('Refactor the internal helper without changing behavior.\n')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('Human Report:', result.stdout)
+        self.assertIn('Codex Brief:', result.stdout)
+        self.assertNotIn('Workspace Observation:', result.stdout)
+        self.assertNotIn('Planning:', result.stdout)
+        self.assertNotIn('source_ids', result.stdout)
 
     def test_blank_input_exits_without_creating_task(self):
         result = self.run_cli("  \t\n")

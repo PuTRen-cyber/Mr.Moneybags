@@ -9,6 +9,8 @@ from mr_moneybags.conversation.models import ProjectConversation, Role
 from mr_moneybags.specification.builder import build_intent_specification
 from mr_moneybags.specification.readiness import evaluate_readiness
 from mr_moneybags.planning.planner import Planner
+from mr_moneybags.reporter import build_codex_brief, build_human_report, format_codex_brief, format_human_report
+from mr_moneybags.safety import SafetyGate
 from mr_moneybags.semantic.interpreter import SemanticInterpreter, SemanticValidationError, interpret_conversation
 from mr_moneybags.runtime import configured_interpreter
 
@@ -20,7 +22,7 @@ def _display_dict(value):
     })
 
 
-def main(*, interpreter: SemanticInterpreter | None = None) -> int:
+def main(*, interpreter: SemanticInterpreter | None = None, debug: bool = False) -> int:
     print("Mr.Moneybags | JIA - Submit one task; no agent execution.")
     try:
         raw_input = input("Task: ")
@@ -34,13 +36,16 @@ def main(*, interpreter: SemanticInterpreter | None = None) -> int:
         print(str(error), file=sys.stderr)
         return 1
 
-    print(json.dumps(asdict(task), ensure_ascii=False, indent=2))
+    if debug:
+        print(json.dumps(asdict(task), ensure_ascii=False, indent=2))
     observation = observe_workspace()
-    print("Workspace Observation:")
-    print(json.dumps(asdict(observation), ensure_ascii=False, indent=2))
-    print("Project Context (Derived Understanding):")
+    if debug:
+        print("Workspace Observation:")
+        print(json.dumps(asdict(observation), ensure_ascii=False, indent=2))
     context = build_project_context(observation)
-    print(json.dumps(asdict(context), ensure_ascii=False, indent=2))
+    if debug:
+        print("Project Context (Derived Understanding):")
+        print(json.dumps(asdict(context), ensure_ascii=False, indent=2))
     conversation = ProjectConversation()
     conversation.add_turn(Role.USER, task.raw_input)
     try:
@@ -56,13 +61,23 @@ def main(*, interpreter: SemanticInterpreter | None = None) -> int:
         print(json.dumps(failure, ensure_ascii=False))
         print(f'Semantic interpretation rejected: {error}', file=sys.stderr)
         return 1
-    print("Conversation / Intent Alignment:")
-    print(json.dumps({"conversation": asdict(conversation),
-                      "alignment": _display_dict(alignment)}, ensure_ascii=False, indent=2))
+    if debug:
+        print("Conversation / Intent Alignment:")
+        print(json.dumps({"conversation": asdict(conversation),
+                          "alignment": _display_dict(alignment)}, ensure_ascii=False, indent=2))
     specification = build_intent_specification(alignment)
-    print("Intent Specification / Readiness:")
-    print(json.dumps({"specification": _display_dict(specification),
-                      "readiness": _display_dict(evaluate_readiness(specification))}, ensure_ascii=False, indent=2))
-    print("Planning:")
-    print(json.dumps(_display_dict(Planner().plan(specification, context)), ensure_ascii=False, separators=(',', ':')))
+    readiness = evaluate_readiness(specification)
+    planning = Planner().plan(specification, context)
+    if debug:
+        print("Intent Specification / Readiness:")
+        print(json.dumps({"specification": _display_dict(specification),
+                          "readiness": _display_dict(readiness)}, ensure_ascii=False, indent=2))
+        print("Planning:")
+        print(json.dumps(_display_dict(planning), ensure_ascii=False, separators=(',', ':')))
+        return 0
+    package = planning.agent_task_package
+    safety = SafetyGate().evaluate(package) if package is not None else None
+    print(format_human_report(build_human_report(specification, safety)))
+    if package is not None:
+        print(format_codex_brief(build_codex_brief(package, safety)))
     return 0

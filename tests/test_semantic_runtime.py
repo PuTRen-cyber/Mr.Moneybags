@@ -17,7 +17,7 @@ class RuntimeTest(unittest.TestCase):
         output, error = StringIO(), StringIO()
         with patch.dict('os.environ', {'MR_MONEYBAGS_SEMANTIC_MODE': 'deterministic'}), \
                 patch('builtins.input', return_value=text), patch('sys.stdout', output), patch('sys.stderr', error):
-            status = main(interpreter=interpreter)
+            status = main(interpreter=interpreter, debug=True)
         return status, output.getvalue(), error.getvalue()
 
     def test_default_cli_calls_semantic_interpreter_and_validation(self):

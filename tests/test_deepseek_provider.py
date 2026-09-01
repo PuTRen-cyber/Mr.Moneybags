@@ -98,7 +98,7 @@ class DeepSeekTest(unittest.TestCase):
                 patch('mr_moneybags.providers.deepseek.urlopen', side_effect=transport) as called, \
                 patch.object(OpenAISemanticClient, 'interpret', side_effect=AssertionError('provider fallback')) as other, \
                 patch('mr_moneybags.semantic.default.DeterministicInterpreter.interpret', side_effect=AssertionError('deterministic fallback')) as fallback:
-            status = main()
+            status = main(debug=True)
         called.assert_called_once()
         other.assert_not_called()
         fallback.assert_not_called()

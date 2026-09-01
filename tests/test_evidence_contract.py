@@ -114,7 +114,7 @@ class EvidenceContractTest(unittest.TestCase):
         client = RuntimeClient()
         output, error = StringIO(), StringIO()
         with patch('builtins.input', return_value=raw), patch('sys.stdout', output), patch('sys.stderr', error):
-            status = main(interpreter=ModelBackedSemanticInterpreter(client))
+            status = main(interpreter=ModelBackedSemanticInterpreter(client), debug=True)
         self.assertEqual(status, 1)
         failure = json.loads(output.getvalue().split('Interpretation Failure:\n')[1])
         self.assertEqual(failure['category'], 'EvidenceValidationFailure')

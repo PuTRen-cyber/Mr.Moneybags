@@ -263,7 +263,7 @@ class SemanticTest(unittest.TestCase):
                 ))
         output = StringIO()
         with patch('builtins.input', return_value='整理安装文档，代码不变。'), patch('sys.stdout', output):
-            status = main(interpreter=Interpreter())
+            status = main(interpreter=Interpreter(), debug=True)
         self.assertEqual(status, 0)
         planning = json.loads(output.getvalue().split('Planning:\n', 1)[1])
         self.assertTrue(planning['success'])
@@ -274,7 +274,7 @@ class SemanticTest(unittest.TestCase):
     def test_cli_validation_failure_stops_before_specification(self):
         output, error = StringIO(), StringIO()
         with patch('builtins.input', return_value='Add a parser.'), patch('sys.stdout', output), patch('sys.stderr', error):
-            status = main(interpreter=FixtureInterpreter(SemanticResult('stale', ())))
+            status = main(interpreter=FixtureInterpreter(SemanticResult('stale', ())), debug=True)
         self.assertEqual(status, 1)
         self.assertIn('stale_source_turn', error.getvalue())
         self.assertNotIn('Planning:\n', output.getvalue())
@@ -283,7 +283,7 @@ class SemanticTest(unittest.TestCase):
         output = StringIO()
         with patch.dict('os.environ', {'MR_MONEYBAGS_SEMANTIC_MODE': 'deterministic'}), \
                 patch('builtins.input', return_value='Add a local parser.'), patch('sys.stdout', output):
-            self.assertEqual(main(), 0)
+            self.assertEqual(main(debug=True), 0)
         self.assertNotIn('"protected_target": null', output.getvalue())
         self.assertNotIn('"implementation_delegation": null', output.getvalue())
         self.assertNotIn('"evidence": []', output.getvalue())

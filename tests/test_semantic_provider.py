@@ -87,7 +87,7 @@ class ProviderTest(unittest.TestCase):
                                       'OPENAI_API_KEY': 'test-only', 'MR_MONEYBAGS_SEMANTIC_MODEL': 'test-model'}, clear=True), \
                 patch('mr_moneybags.providers.openai.urlopen', side_effect=transport) as called, \
                 patch('builtins.input', return_value='Find records.'), patch('sys.stdout', output):
-            self.assertEqual(main(), 0)
+            self.assertEqual(main(debug=True), 0)
         called.assert_called_once()
         plan = json.loads(output.getvalue().split('Planning:\n')[1])
         self.assertEqual(plan['current_work_unit']['objective']['value'], 'Find local records.')
@@ -114,7 +114,7 @@ class ProviderTest(unittest.TestCase):
         output, error = StringIO(), StringIO()
         with patch.dict('os.environ', {'MR_MONEYBAGS_SEMANTIC_MODE': 'model', 'MR_MONEYBAGS_SEMANTIC_PROVIDER': 'openai'}, clear=True), \
                 patch('builtins.input', return_value='Keep raw request.'), patch('sys.stdout', output), patch('sys.stderr', error):
-            self.assertEqual(main(), 1)
+            self.assertEqual(main(debug=True), 1)
         self.assertIn('missing_OPENAI_API_KEY', error.getvalue())
         self.assertIn('Keep raw request.', output.getvalue())
         self.assertNotIn('Planning:', output.getvalue())

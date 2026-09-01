@@ -102,7 +102,7 @@ class ModelRuntimeTest(unittest.TestCase):
     def run_cli(self, text, client):
         output, errors = StringIO(), StringIO()
         with patch('builtins.input', return_value=text), patch('sys.stdout', output), patch('sys.stderr', errors):
-            status = main(interpreter=ModelBackedSemanticInterpreter(client))
+            status = main(interpreter=ModelBackedSemanticInterpreter(client), debug=True)
         return status, output.getvalue(), errors.getvalue()
 
     def test_protected_constraints_and_paraphrases_reach_package(self):
