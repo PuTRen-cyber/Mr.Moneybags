@@ -10,6 +10,7 @@ from mr_moneybags.specification.builder import build_intent_specification
 from mr_moneybags.specification.readiness import evaluate_readiness
 from mr_moneybags.planning.planner import Planner
 from mr_moneybags.reporter import build_codex_brief, build_human_report, format_codex_brief, format_human_report
+from mr_moneybags.readiness import IntentReadinessClassifier, ReadinessStatus
 from mr_moneybags.safety import SafetyGate
 from mr_moneybags.semantic.interpreter import SemanticInterpreter, SemanticValidationError, interpret_conversation
 from mr_moneybags.runtime import configured_interpreter
@@ -65,6 +66,11 @@ def main(*, interpreter: SemanticInterpreter | None = None, debug: bool = False)
         print("Conversation / Intent Alignment:")
         print(json.dumps({"conversation": asdict(conversation),
                           "alignment": _display_dict(alignment)}, ensure_ascii=False, indent=2))
+    intent_readiness = IntentReadinessClassifier().classify(task.raw_input, alignment.current_intent)
+    if intent_readiness.status != ReadinessStatus.READY:
+        print("Intent Readiness:")
+        print(json.dumps(asdict(intent_readiness), ensure_ascii=False, indent=2))
+        return 0
     specification = build_intent_specification(alignment)
     readiness = evaluate_readiness(specification)
     planning = Planner().plan(specification, context)
