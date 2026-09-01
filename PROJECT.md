@@ -8,7 +8,7 @@
 
 ## 当前阶段
 
-Phase 0–5.5B 已完成。Phase 5.5C 增加模型实现：有界 SemanticContext → ModelBackedSemanticInterpreter → 提供方无关 SemanticModelClient → 严格结构/证据验证 → CurrentIntent → 原 Phase 4/5。默认确定性解释器保留；模型模式需显式配置。Phase 6 Codex Integration 暂停，等待实际语义理解通过 Shadow Evaluation，接入实现不等于质量验收。
+Phase 0–5.5C 已完成。Phase 5.5D 增加独立 Task Safety Gate，在未来委派前对既有 AgentTaskPackage 进行有限确定性检查。Phase 4/5 与语义契约保持不变；Phase 6 Codex Integration 暂停，等待实际语义理解通过 Shadow Evaluation，接入实现不等于质量验收。
 
 路线图重编号不代表跳过工作：旧 Phase 2A + 2B → 新 Phase 2；旧 Phase 2C → 新 Phase 3；旧 Phase 2D → 新 Phase 4；旧 Phase 2E → 新 Phase 5；旧 Phase 3 → 新 Phase 6。历史提交与实现保持原样。
 
@@ -80,6 +80,8 @@ Semantic Interpreter consumes Semantic Context, not full Project Context。当�
 不调用 Codex 或其他 Agent；不实现 Coding Agent Prompt、AgentAdapter、执行、监控、Policy/Approval、Verification/Recovery、Stable State、Memory、RAG、Vector Database、MCP、Skills 集成、Multi-Agent、A2A、UI、数据库、后台观察、进度轮询或 ModelRouter。不提前实现 Phase 6。
 
 ## 验收与检查点
+
+Task Safety Gate 仅检查工作包中的目标、范围、约束、行为要求和验收条件。缺失目标会阻止委派；有限的破坏性操作、敏感区域和整体范围扩张规则要求确认；普通开发工作保持 LOW/ALLOW。规则不使用 LLM，不授予执行权限，不代表完整安全保证或自主审批，也未接入 Agent。
 
 语义层区分当前目标/范围、未来考虑、受保护约束、普通实现委派和实质歧义。每项解释关联 user 原文片段，解释不是引用本身；引用验证不能证明解释忠实。未来内容不进入当前工作单元及验收条件；普通实现委派不授权破坏性操作、发布、push 或扩展产品范围。
 

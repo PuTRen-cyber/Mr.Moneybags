@@ -4,7 +4,7 @@
 
 **土老板负责目标，小江负责管理，Agent 负责执行。**
 
-当前为 Phase 5.5C — Model-backed Semantic Interpreter：CLI 统一经过 SemanticInterpreter → 语义验证 → CurrentIntent → 既有 Phase 4/5。默认仍使用有限确定性规则，显式模型模式可调用真实语义模型。展示 JSON 后退出，不调用 Codex 或 Coding Agent，不执行任务或文档命令、不持久化，不启动聊天循环。
+当前为 Phase 5.5D — Task Safety Gate：既有语义与规划流程保持不变，并新增一个独立、确定性的工作包安全检查边界。展示 JSON 后退出，不调用 Codex 或 Coding Agent，不执行任务或文档命令、不持久化，不启动聊天循环。
 
 v5.0 路线图已重编号：旧 Phase 2A/2B 合并为新 Phase 2，旧 Phase 2C 对应新 Phase 3，旧 Phase 2D 对应新 Phase 4。没有跳过阶段，也没有重写已接受实现或 Git 历史。完整路线图见 PROJECT.md。
 
@@ -209,6 +209,12 @@ DeterministicInterpreter 仅将既有 IntentExtractor 的单轮结果转换为 S
 
 成功路径不增加输出段落，不展示供应商/模型内部信息；失败路径单独显示结构化解释错误。隐藏新增元数据的空值。现有 CLI JSON 仍偏多，后续人类可读输出设计见 TODO，本阶段不实现 Reporter。
 
+## Task Safety Gate
+
+`SafetyGate` 只评估既有 `AgentTaskPackage` 的目标、范围、约束、行为要求和验收条件，返回 `ALLOW`、`REQUIRE_CONFIRMATION` 或 `BLOCK`。当前规则仅覆盖有限的破坏性操作、敏感区域、整体范围扩张和缺失目标；普通开发任务默认放行，并对移除未使用 import 的常规清理作窄范围排除。
+
+该结果不是安全保证、执行许可或自主审批。安全门不调用模型、不执行任务，也尚未接入任何 Agent 委派流程；未来仍需人工确认机制和执行治理。
+
 ## 测试
 
 ```powershell
@@ -247,6 +253,10 @@ mr_moneybags/
     planner.py    # 有限确定性规划与历史替代
     package.py    # 项目证据摘要与结构化工作包
     briefing.py   # 简洁派发预览
+  safety/
+    models.py     # 安全决策与风险等级
+    rules.py      # 有限确定性规则
+    gate.py       # 工作包安全评估入口
   semantic/
     __init__.py
     models.py     # 语义声明与歧义契约
