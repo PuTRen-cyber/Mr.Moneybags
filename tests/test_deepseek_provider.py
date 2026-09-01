@@ -109,7 +109,7 @@ class DeepSeekTest(unittest.TestCase):
             turn = json.loads(json.loads(request.data)['messages'][1]['content'])['current_turn']
             result = {'source_turn_id': turn['id'], 'claims': [{'id': 'goal', 'concept_id': 'search', 'kind': 'goal',
                 'value': 'Add search.', 'protected_target': None, 'implementation_delegation': None,
-                'evidence': [{'turn_id': turn['id'], 'start': 0, 'end': 11, 'quote': 'Add search.'}]}], 'ambiguities': []}
+                'evidence': [{'turn_id': turn['id'], 'start': 0, 'end': 11}]}], 'ambiguities': []}
             return BytesIO(json.dumps(envelope(json.dumps(result))).encode())
         status, output, error = self.run_cli(transport)
         self.assertEqual(status, 0, error)
@@ -131,19 +131,18 @@ class DeepSeekTest(unittest.TestCase):
             self.assertNotIn('Planning:', output)
             self.assertNotIn('private detail', output + error)
 
-    def test_quote_mismatch_uses_existing_evidence_failure(self):
+    def test_punctuation_boundary_derives_quote_from_selected_span(self):
         def transport(request, **kwargs):
             turn = json.loads(json.loads(request.data)['messages'][1]['content'])['current_turn']
             result = {'source_turn_id': turn['id'], 'claims': [{'id': 'goal', 'concept_id': 'search', 'kind': 'goal',
                 'value': 'Add search.', 'protected_target': None, 'implementation_delegation': None,
-                'evidence': [{'turn_id': turn['id'], 'start': 0, 'end': 11, 'quote': 'fabricated!'}]}], 'ambiguities': []}
+                'evidence': [{'turn_id': turn['id'], 'start': 0, 'end': 10}]}], 'ambiguities': []}
             return BytesIO(json.dumps(envelope(json.dumps(result))).encode())
         status, output, error = self.run_cli(transport)
-        self.assertEqual(status, 1)
-        failure = json.loads(output.split('Interpretation Failure:\n')[1])
-        self.assertEqual(failure['category'], 'EvidenceValidationFailure')
-        self.assertEqual(failure['code'], 'quote_mismatch')
-        self.assertNotIn('Planning:', output)
+        self.assertEqual(status, 0, error)
+        alignment = json.loads(output.split('Conversation / Intent Alignment:\n')[1]
+                               .split('Intent Specification / Readiness:\n')[0])['alignment']
+        self.assertEqual(alignment['statements'][0]['evidence'][0]['quote'], 'Add search')
 
     def test_empty_content_fails_closed_without_retry_or_fallback(self):
         for content in ('', ' ', None):

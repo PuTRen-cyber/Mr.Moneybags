@@ -19,7 +19,6 @@ TEXT = {'type': 'string', 'minLength': 1, 'maxLength': 4096}
 IDENTIFIER = {'type': 'string', 'minLength': 1, 'maxLength': 128}
 EVIDENCE = _array(_object({
     'turn_id': IDENTIFIER, 'start': {'type': 'integer'}, 'end': {'type': 'integer'},
-    'quote': {'type': 'string', 'minLength': 1, 'maxLength': 8000},
 }), 8)
 RESULT_SCHEMA = _object({
     'source_turn_id': IDENTIFIER,
@@ -71,7 +70,7 @@ def _unique_object(pairs):
     return value
 
 
-def decode_result(text: str) -> SemanticResult:
+def decode_result(text: str, turns) -> SemanticResult:
     if not isinstance(text, str) or len(text) > 262144:
         raise ModelOutputFailure('invalid_output_size')
     try:
@@ -79,8 +78,15 @@ def decode_result(text: str) -> SemanticResult:
     except (ValueError, RecursionError):
         raise ModelOutputFailure('malformed_json') from None
     _check(data, RESULT_SCHEMA)
+    by_id = {turn.id: turn for turn in turns}
     def evidence(items):
-        return tuple(EvidenceReference(**item) for item in items)
+        references = []
+        for item in items:
+            turn = by_id.get(item['turn_id'])
+            start, end = item['start'], item['end']
+            quote = turn.raw_text[start:end] if turn is not None else ''
+            references.append(EvidenceReference(item['turn_id'], start, end, quote))
+        return tuple(references)
     claims = tuple(SemanticClaim(
         item['id'], item['concept_id'], IntentKind(item['kind']), item['value'], evidence(item['evidence']),
         item['protected_target'], ImplementationDelegation(item['implementation_delegation'])

@@ -76,7 +76,7 @@ class ProviderTest(unittest.TestCase):
             turn = context['current_turn']
             data = {'source_turn_id': turn['id'], 'claims': [{
                 'id': 'search', 'concept_id': 'search', 'kind': 'goal', 'value': 'Find local records.',
-                'evidence': [{'turn_id': turn['id'], 'start': 0, 'end': len(turn['raw_text']), 'quote': turn['raw_text']}],
+                'evidence': [{'turn_id': turn['id'], 'start': 0, 'end': len(turn['raw_text'])}],
                 'protected_target': None, 'implementation_delegation': None}], 'ambiguities': []}
             return BytesIO(json.dumps(envelope(json.dumps(data))).encode())
         from io import StringIO

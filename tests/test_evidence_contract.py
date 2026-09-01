@@ -20,7 +20,11 @@ class Client:
 
     def interpret(self, request):
         self.calls += 1
-        return SemanticModelResponse(json.dumps(asdict(self.result), ensure_ascii=False))
+        data = asdict(self.result)
+        for claim in data['claims']:
+            for evidence in claim['evidence']:
+                evidence.pop('quote')
+        return SemanticModelResponse(json.dumps(data, ensure_ascii=False))
 
 
 def conversation(text):
@@ -86,14 +90,14 @@ class EvidenceContractTest(unittest.TestCase):
                 validate_semantics(semantic_result(turn, quote, start=wrong_start, end=wrong_end), tuple(conv.turns))
 
     def test_prompt_makes_verbatim_contract_explicit_with_examples(self):
-        required = ('character-for-character', 'one contiguous substring', 'raw_text[start:end] == quote',
-                    'exclusive', 'omit the unsupported claim', 'never synthesize')
+        required = ('do not generate', 'only turn_id, start, and end', 'quote = raw_text[start:end]',
+                    'exclusive', 'omit the unsupported claim', 'rather than guess offsets')
         for phrase in required:
             self.assertIn(phrase, INSTRUCTIONS.lower())
         self.assertIn('Valid:', INSTRUCTIONS)
         self.assertIn('Invalid:', INSTRUCTIONS)
-        self.assertIn('semantic value', INSTRUCTIONS)
-        self.assertIn('evidence quote', INSTRUCTIONS)
+        self.assertIn('semantic value', INSTRUCTIONS.lower())
+        self.assertIn('quote is not model input', INSTRUCTIONS)
 
     def test_runtime_diagnostic_identifies_mismatch_without_provider_dump(self):
         raw = '保持空格  和标点。'
@@ -103,9 +107,10 @@ class EvidenceContractTest(unittest.TestCase):
             def interpret(self, request):
                 self.calls += 1
                 turn = request.context.current_turn
-                result = semantic_result(turn, '保持空格 和标点。', value='Preserve formatting.',
-                                         start=0, end=len(turn.raw_text))
-                return SemanticModelResponse(json.dumps(asdict(result), ensure_ascii=False))
+                result = asdict(semantic_result(turn, turn.raw_text, value='Preserve formatting.',
+                                                start=0, end=len(turn.raw_text) + 1))
+                result['claims'][0]['evidence'][0].pop('quote')
+                return SemanticModelResponse(json.dumps(result, ensure_ascii=False))
         client = RuntimeClient()
         output, error = StringIO(), StringIO()
         with patch('builtins.input', return_value=raw), patch('sys.stdout', output), patch('sys.stderr', error):
@@ -115,17 +120,18 @@ class EvidenceContractTest(unittest.TestCase):
         self.assertEqual(failure['category'], 'EvidenceValidationFailure')
         self.assertEqual(failure['diagnostic']['semantic_field'], 'claims[0].evidence[0]')
         self.assertEqual(failure['diagnostic']['turn_id'], failure['conversation']['turns'][0]['id'])
-        self.assertEqual(failure['diagnostic']['quote'], '保持空格 和标点。')
-        self.assertEqual(failure['diagnostic']['source_span'], raw)
+        self.assertEqual(failure['code'], 'invalid_span_bounds')
+        self.assertEqual(failure['diagnostic']['quote'], raw)
+        self.assertIsNone(failure['diagnostic']['source_span'])
         self.assertEqual(client.calls, 1)
         self.assertNotIn('provider_response', failure)
         self.assertNotIn('instructions', failure)
         self.assertNotIn('reasoning', failure)
         self.assertNotIn('Planning:', output.getvalue())
 
-    def test_model_path_rejects_paraphrase_without_fallback(self):
+    def test_model_path_rejects_invalid_span_without_fallback(self):
         conv = conversation('不要改变当前颜色。')
-        result = semantic_result(conv.turns[0], '不要修改当前颜色。', start=0, end=len(conv.turns[0].raw_text))
+        result = semantic_result(conv.turns[0], conv.turns[0].raw_text, start=-1, end=len(conv.turns[0].raw_text))
         client = Client(result)
         with patch('mr_moneybags.semantic.default.DeterministicInterpreter.interpret',
                    side_effect=AssertionError('fallback')) as fallback:

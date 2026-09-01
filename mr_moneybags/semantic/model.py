@@ -65,13 +65,14 @@ class ModelBackedSemanticInterpreter:
             raise TransportFailure('model_client_failed') from None
         if not isinstance(response, SemanticModelResponse):
             raise ModelOutputFailure('invalid_response_type')
-        result = decode_result(response.json_text)
+        evidence_turns = context.recent_turns + (context.current_turn,)
+        result = decode_result(response.json_text, evidence_turns)
         try:
-            validate_semantics(result, context.recent_turns + (context.current_turn,))
+            validate_semantics(result, evidence_turns)
         except SemanticValidationError as error:
             if str(error) in {'stale_source_turn', 'missing_or_invalid_evidence', 'invalid_evidence_type',
                               'non_user_evidence', 'invalid_span_type', 'invalid_span_bounds', 'quote_mismatch'}:
-                diagnostic = _evidence_diagnostic(result, context.recent_turns + (context.current_turn,), str(error))
+                diagnostic = _evidence_diagnostic(result, evidence_turns, str(error))
                 raise EvidenceValidationFailure(str(error), diagnostic) from None
             raise ModelOutputFailure(str(error)) from None
         if not any(item.kind == IntentKind.GOAL for item in result.claims) and not result.ambiguities:
