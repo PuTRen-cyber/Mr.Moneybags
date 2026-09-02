@@ -6,6 +6,7 @@ from mr_moneybags.task import Task
 from mr_moneybags.observation import observe_workspace
 from mr_moneybags.context import build_project_context
 from mr_moneybags.conversation.models import ProjectConversation, Role
+from mr_moneybags.decision_context import build_decision_context
 from mr_moneybags.specification.builder import build_intent_specification
 from mr_moneybags.specification.readiness import evaluate_readiness
 from mr_moneybags.planning.planner import Planner
@@ -63,6 +64,7 @@ def main(*, interpreter: SemanticInterpreter | None = None, debug: bool = False)
         print(json.dumps(failure, ensure_ascii=False))
         print(f'Semantic interpretation rejected: {error}', file=sys.stderr)
         return 1
+    decision_context = build_decision_context(alignment)
     if debug:
         print("Conversation / Intent Alignment:")
         print(json.dumps({"conversation": asdict(conversation),
@@ -90,7 +92,7 @@ def main(*, interpreter: SemanticInterpreter | None = None, debug: bool = False)
         return 0
     package = planning.agent_task_package
     safety = SafetyGate().evaluate(package) if package is not None else None
-    print(format_human_report(build_human_report(specification, safety)))
+    print(format_human_report(build_human_report(specification, safety, decision_context)))
     if package is not None:
-        print(format_codex_brief(build_codex_brief(package, safety)))
+        print(format_codex_brief(build_codex_brief(package, safety, decision_context)))
     return 0

@@ -1,14 +1,27 @@
 from mr_moneybags.planning.models import AgentTaskPackage
+from mr_moneybags.decision_context.models import DecisionContext
 from mr_moneybags.reporter.models import CodexBrief
 from mr_moneybags.safety.models import SafetyDecision
 
 
 def build_codex_brief(package: AgentTaskPackage,
-                      safety: SafetyDecision | None = None) -> CodexBrief:
-    objective = package.objective.value.strip() or 'Task objective is insufficient.'
-    requirements = _values((*package.scope_in, *package.behavior_requirements))
+                      safety: SafetyDecision | None = None,
+                      decision_context: DecisionContext | None = None) -> CodexBrief:
+    objective_claim = decision_context.objective if decision_context is not None else package.objective
+    objective = objective_claim.value.strip() if objective_claim else ''
+    objective = objective or 'Task objective is insufficient.'
+    scope_in = (decision_context.scope_in or package.scope_in) if decision_context is not None else package.scope_in
+    requirements = _values((*scope_in, *package.behavior_requirements))
     constraints = _values(package.constraints)
-    constraints.extend(f'Do not include: {item.value}' for item in package.scope_out)
+    if decision_context is None:
+        scope_out = package.scope_out
+    else:
+        context_scope_out = tuple(decision_context.scope_out)
+        context_ids = {item.id for item in context_scope_out}
+        generated_scope_out = tuple(item for item in package.scope_out
+                                    if not context_ids.intersection(item.source_ids))
+        scope_out = (*context_scope_out, *generated_scope_out)
+    constraints.extend(f'Do not include: {item.value}' for item in scope_out)
     return CodexBrief(
         package.task_title,
         objective,
