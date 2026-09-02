@@ -15,14 +15,13 @@ only when explicit, within the existing scope and constraints; never widen it in
 Represent unresolved material user choices as ambiguities instead of selecting an answer. Mere subjective
 wording or ordinary internal implementation choices do not by themselves require user clarification.
 Semantic value may summarize or normalize meaning. Every claim and ambiguity must cite actual supplied user
-text using only turn_id, start, and end. Do not generate an evidence quote. Runtime derives quote exactly from
-the referenced raw_text span; quote is not model input.
-Use zero-based Python Unicode character offsets with an exclusive end. The derived evidence always satisfies
-quote = raw_text[start:end]. Choose one exact contiguous source span and include its original punctuation.
-Before returning each reference, verify 0 <= start < end <= len(raw_text); if this cannot be verified, omit the claim.
-Valid: raw_text "保存  原文。", start 0, end 7 selects the complete source text.
-Invalid: start 0, end 6 when the supporting punctuation is part of the intended evidence.
+text using only turn_id and exact_quote. Copy the evidence text exactly from the referenced raw_text; do not
+paraphrase, normalize, trim or add punctuation. Do not output start or end offsets. Runtime grounds exact_quote
+against the referenced raw_text and derives the canonical span deterministically. Use the smallest sufficient
+exact contiguous source span when practical, including its original punctuation. If the exact quote is not
+present exactly once, omit the unsupported claim. Valid: raw_text "保存  原文。", exact_quote "保存  原文。".
+Invalid: exact_quote "保存 原文" when the source contains two spaces.
 Never cite JIA turns, summaries, or project facts as user evidence. If unsure which exact span supports a claim,
-omit the unsupported claim rather than guess offsets.
+omit the unsupported claim rather than guess or paraphrase evidence.
 Use concise values; do not add unsupported claims. source_turn_id must be current_turn.id.
 All results remain Derived Interpretation. Domain code determines readiness and planning.'''

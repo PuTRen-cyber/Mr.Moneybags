@@ -3,7 +3,7 @@ import json
 from mr_moneybags.conversation.models import (
     DecisionOwner, EvidenceReference, ImplementationDelegation, IntentKind, Materiality,
 )
-from mr_moneybags.semantic.failures import ModelOutputFailure
+from mr_moneybags.semantic.failures import EvidenceValidationFailure, ModelOutputFailure
 from mr_moneybags.semantic.models import SemanticAmbiguity, SemanticClaim, SemanticResult
 
 
@@ -17,8 +17,9 @@ def _array(items, maximum):
 
 TEXT = {'type': 'string', 'minLength': 1, 'maxLength': 4096}
 IDENTIFIER = {'type': 'string', 'minLength': 1, 'maxLength': 128}
+EXACT_QUOTE = {'type': 'string', 'minLength': 1, 'maxLength': 8192}
 EVIDENCE = _array(_object({
-    'turn_id': IDENTIFIER, 'start': {'type': 'integer'}, 'end': {'type': 'integer'},
+    'turn_id': IDENTIFIER, 'exact_quote': EXACT_QUOTE,
 }), 8)
 RESULT_SCHEMA = _object({
     'source_turn_id': IDENTIFIER,
@@ -79,23 +80,38 @@ def decode_result(text: str, turns) -> SemanticResult:
         raise ModelOutputFailure('malformed_json') from None
     _check(data, RESULT_SCHEMA)
     by_id = {turn.id: turn for turn in turns}
-    def evidence(items):
+    def evidence(items, group, parent_index):
         references = []
-        for item in items:
+        for evidence_index, item in enumerate(items):
             turn = by_id.get(item['turn_id'])
-            start, end = item['start'], item['end']
-            valid_span = (turn is not None and type(start) is int and type(end) is int
-                          and 0 <= start < end <= len(turn.raw_text))
-            quote = turn.raw_text[start:end] if valid_span else ''
+            quote = item['exact_quote']
+            diagnostic = {
+                'semantic_field': f'{group}[{parent_index}].evidence[{evidence_index}]',
+                'turn_id': item['turn_id'],
+                'quote': quote, 'start': None, 'end': None, 'source_span': None,
+            }
+            if turn is None:
+                diagnostic['reason'] = 'non_user_evidence'
+                raise EvidenceValidationFailure('non_user_evidence', diagnostic)
+            first = turn.raw_text.find(quote)
+            if first < 0:
+                diagnostic['reason'] = 'evidence_quote_not_found'
+                raise EvidenceValidationFailure('evidence_quote_not_found', diagnostic)
+            if turn.raw_text.find(quote, first + 1) >= 0:
+                diagnostic['reason'] = 'ambiguous_evidence_quote'
+                raise EvidenceValidationFailure('ambiguous_evidence_quote', diagnostic)
+            start, end = first, first + len(quote)
+            quote = turn.raw_text[start:end]
+            diagnostic.update(start=start, end=end, source_span=quote)
             references.append(EvidenceReference(item['turn_id'], start, end, quote))
         return tuple(references)
     claims = tuple(SemanticClaim(
-        item['id'], item['concept_id'], IntentKind(item['kind']), item['value'], evidence(item['evidence']),
+        item['id'], item['concept_id'], IntentKind(item['kind']), item['value'], evidence(item['evidence'], 'claims', index),
         item['protected_target'], ImplementationDelegation(item['implementation_delegation'])
         if item['implementation_delegation'] is not None else None,
-    ) for item in data['claims'])
+    ) for index, item in enumerate(data['claims']))
     ambiguities = tuple(SemanticAmbiguity(
-        item['topic'], item['description'], evidence(item['evidence']),
+        item['topic'], item['description'], evidence(item['evidence'], 'ambiguities', index),
         DecisionOwner(item['decision_owner']), Materiality(item['materiality']), tuple(item['candidate_interpretations']),
-    ) for item in data['ambiguities'])
+    ) for index, item in enumerate(data['ambiguities']))
     return SemanticResult(data['source_turn_id'], claims, ambiguities)

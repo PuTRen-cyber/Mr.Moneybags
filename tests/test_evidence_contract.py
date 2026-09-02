@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from mr_moneybags.cli import main
 from mr_moneybags.conversation.models import EvidenceReference, IntentKind, ProjectConversation
-from mr_moneybags.semantic.failures import EvidenceValidationFailure
+from mr_moneybags.semantic.failures import EvidenceValidationFailure, ModelOutputFailure
 from mr_moneybags.semantic.interpreter import SemanticValidationError, interpret_conversation, validate_semantics
 from mr_moneybags.semantic.model import ModelBackedSemanticInterpreter, SemanticModelResponse
 from mr_moneybags.semantic.models import SemanticClaim, SemanticResult
@@ -23,7 +23,9 @@ class Client:
         data = asdict(self.result)
         for claim in data['claims']:
             for evidence in claim['evidence']:
-                evidence.pop('quote')
+                evidence['exact_quote'] = evidence.pop('quote')
+                evidence.pop('start')
+                evidence.pop('end')
         return SemanticModelResponse(json.dumps(data, ensure_ascii=False))
 
 
@@ -90,14 +92,14 @@ class EvidenceContractTest(unittest.TestCase):
                 validate_semantics(semantic_result(turn, quote, start=wrong_start, end=wrong_end), tuple(conv.turns))
 
     def test_prompt_makes_verbatim_contract_explicit_with_examples(self):
-        required = ('do not generate', 'only turn_id, start, and end', 'quote = raw_text[start:end]',
-                    'exclusive', 'omit the unsupported claim', 'rather than guess offsets')
+        required = ('exact_quote', 'copy the evidence text exactly', 'do not output start or end',
+                    'deterministically', 'omit the unsupported claim', 'rather than guess')
         for phrase in required:
             self.assertIn(phrase, INSTRUCTIONS.lower())
         self.assertIn('Valid:', INSTRUCTIONS)
         self.assertIn('Invalid:', INSTRUCTIONS)
         self.assertIn('semantic value', INSTRUCTIONS.lower())
-        self.assertIn('quote is not model input', INSTRUCTIONS)
+        self.assertIn('quote', INSTRUCTIONS)
 
     def test_prompt_makes_singleton_contract_explicit(self):
         required = ('single highest-level objective', 'at most one goal', 'single overall result',
@@ -114,9 +116,11 @@ class EvidenceContractTest(unittest.TestCase):
             def interpret(self, request):
                 self.calls += 1
                 turn = request.context.current_turn
-                result = asdict(semantic_result(turn, turn.raw_text, value='Preserve formatting.',
-                                                start=0, end=len(turn.raw_text) + 1))
-                result['claims'][0]['evidence'][0].pop('quote')
+                result = asdict(semantic_result(turn, '保持空格 和标点。', value='Preserve formatting.'))
+                evidence = result['claims'][0]['evidence'][0]
+                evidence['exact_quote'] = evidence.pop('quote')
+                evidence.pop('start')
+                evidence.pop('end')
                 return SemanticModelResponse(json.dumps(result, ensure_ascii=False))
         client = RuntimeClient()
         output, error = StringIO(), StringIO()
@@ -127,8 +131,8 @@ class EvidenceContractTest(unittest.TestCase):
         self.assertEqual(failure['category'], 'EvidenceValidationFailure')
         self.assertEqual(failure['diagnostic']['semantic_field'], 'claims[0].evidence[0]')
         self.assertEqual(failure['diagnostic']['turn_id'], failure['conversation']['turns'][0]['id'])
-        self.assertEqual(failure['code'], 'invalid_span_bounds')
-        self.assertEqual(failure['diagnostic']['quote'], '')
+        self.assertEqual(failure['code'], 'evidence_quote_not_found')
+        self.assertEqual(failure['diagnostic']['quote'], '保持空格 和标点。')
         self.assertIsNone(failure['diagnostic']['source_span'])
         self.assertEqual(client.calls, 1)
         self.assertNotIn('provider_response', failure)
@@ -151,17 +155,19 @@ class EvidenceContractTest(unittest.TestCase):
             evidence = statement.evidence[0]
             self.assertEqual(evidence.quote, raw[evidence.start:evidence.end])
 
-    def test_chinese_reproduction_out_of_bounds_span_is_not_materialized(self):
+    def test_chinese_reproduction_ungrounded_quote_is_rejected(self):
         raw = '课程管理系统增加作业功能。老师可以创建作业，学生可以查看。提交和评分以后再考虑。'
 
         class RuntimeClient:
             def interpret(self, request):
                 turn = request.context.current_turn
-                result = semantic_result(turn, '后再考虑。', value='Future consideration.', start=35, end=42)
+                result = semantic_result(turn, '提交和评分再考虑。', value='Future consideration.')
                 data = asdict(result)
                 for claim in data['claims']:
                     for evidence in claim['evidence']:
-                        evidence.pop('quote')
+                        evidence['exact_quote'] = evidence.pop('quote')
+                        evidence.pop('start')
+                        evidence.pop('end')
                 return SemanticModelResponse(json.dumps(data, ensure_ascii=False))
 
         output, error = StringIO(), StringIO()
@@ -170,19 +176,123 @@ class EvidenceContractTest(unittest.TestCase):
         self.assertEqual(status, 1)
         failure = json.loads(output.getvalue().split('Interpretation Failure:\n')[1])
         self.assertEqual(failure['category'], 'EvidenceValidationFailure')
-        self.assertEqual(failure['code'], 'invalid_span_bounds')
-        self.assertEqual(failure['diagnostic']['start'], 35)
-        self.assertEqual(failure['diagnostic']['end'], 42)
-        self.assertEqual(failure['diagnostic']['quote'], '')
+        self.assertEqual(failure['code'], 'evidence_quote_not_found')
+        self.assertEqual(failure['diagnostic']['quote'], '提交和评分再考虑。')
+        self.assertIsNone(failure['diagnostic']['start'])
         self.assertIsNone(failure['diagnostic']['source_span'])
 
-    def test_model_path_rejects_invalid_span_without_fallback(self):
+    def test_model_path_rejects_legacy_offsets_without_fallback(self):
         conv = conversation('不要改变当前颜色。')
-        result = semantic_result(conv.turns[0], conv.turns[0].raw_text, start=-1, end=len(conv.turns[0].raw_text))
-        client = Client(result)
+        turn = conv.turns[0]
+
+        class Client:
+            calls = 0
+
+            def interpret(self, request):
+                self.calls += 1
+                payload = {
+                    'source_turn_id': turn.id,
+                    'claims': [{
+                        'id': 'goal', 'concept_id': 'color', 'kind': 'goal', 'value': 'Preserve color.',
+                        'evidence': [{'turn_id': turn.id, 'start': 0, 'end': len(turn.raw_text)}],
+                        'protected_target': None, 'implementation_delegation': None,
+                    }],
+                    'ambiguities': [],
+                }
+                return SemanticModelResponse(json.dumps(payload, ensure_ascii=False))
+
+        client = Client()
         with patch('mr_moneybags.semantic.default.DeterministicInterpreter.interpret',
                    side_effect=AssertionError('fallback')) as fallback:
-            with self.assertRaises(EvidenceValidationFailure):
+            with self.assertRaisesRegex(ModelOutputFailure, 'unsupported_or_missing_output_fields'):
                 interpret_conversation(conv, ModelBackedSemanticInterpreter(client))
         self.assertEqual(client.calls, 1)
         fallback.assert_not_called()
+
+    def test_model_path_grounds_exact_quote_deterministically(self):
+        raw = '课程管理系统增加作业功能。老师可以创建作业，学生可以查看。提交和评分以后再考虑。'
+        conv = conversation(raw)
+        turn = conv.turns[0]
+        payload = {
+            'source_turn_id': turn.id,
+            'claims': [{
+                'id': 'goal', 'concept_id': 'assignment', 'kind': 'goal',
+                'value': 'Manage assignments.', 'evidence': [{'turn_id': turn.id, 'exact_quote': '提交和评分以后再考虑。'}],
+                'protected_target': None, 'implementation_delegation': None,
+            }],
+            'ambiguities': [],
+        }
+
+        class Client:
+            def interpret(self, request):
+                return SemanticModelResponse(json.dumps(payload, ensure_ascii=False))
+
+        result = interpret_conversation(conv, ModelBackedSemanticInterpreter(Client()))
+        evidence = result.current_intent.goal.evidence[0]
+        self.assertEqual(evidence.quote, '提交和评分以后再考虑。')
+        self.assertEqual(evidence.quote, raw[evidence.start:evidence.end])
+
+    def test_model_path_grounds_unicode_quote_without_offset_calculation(self):
+        raw = '保留原始格式 😀，并继续处理。'
+        conv = conversation(raw)
+        turn = conv.turns[0]
+        payload = {
+            'source_turn_id': turn.id,
+            'claims': [{
+                'id': 'goal', 'concept_id': 'format', 'kind': 'goal', 'value': 'Preserve formatting.',
+                'evidence': [{'turn_id': turn.id, 'exact_quote': '原始格式 😀'}],
+                'protected_target': None, 'implementation_delegation': None,
+            }],
+            'ambiguities': [],
+        }
+
+        class Client:
+            def interpret(self, request):
+                return SemanticModelResponse(json.dumps(payload, ensure_ascii=False))
+
+        result = interpret_conversation(conv, ModelBackedSemanticInterpreter(Client()))
+        evidence = result.current_intent.goal.evidence[0]
+        self.assertEqual(evidence.quote, raw[evidence.start:evidence.end])
+
+    def test_model_path_rejects_ungrounded_quote_without_fallback(self):
+        conv = conversation('请保留原始格式。')
+        turn = conv.turns[0]
+        payload = {
+            'source_turn_id': turn.id,
+            'claims': [{
+                'id': 'goal', 'concept_id': 'format', 'kind': 'goal', 'value': 'Preserve formatting.',
+                'evidence': [{'turn_id': turn.id, 'exact_quote': '保留格式'}],
+                'protected_target': None, 'implementation_delegation': None,
+            }],
+            'ambiguities': [],
+        }
+
+        class Client:
+            def interpret(self, request):
+                return SemanticModelResponse(json.dumps(payload, ensure_ascii=False))
+
+        with patch('mr_moneybags.semantic.default.DeterministicInterpreter.interpret',
+                   side_effect=AssertionError('fallback')) as fallback:
+            with self.assertRaisesRegex(EvidenceValidationFailure, 'evidence_quote_not_found'):
+                interpret_conversation(conv, ModelBackedSemanticInterpreter(Client()))
+        fallback.assert_not_called()
+
+    def test_model_path_rejects_ambiguous_exact_quote(self):
+        conv = conversation('保留原始格式，然后保留原始格式。')
+        turn = conv.turns[0]
+        payload = {
+            'source_turn_id': turn.id,
+            'claims': [{
+                'id': 'goal', 'concept_id': 'format', 'kind': 'goal', 'value': 'Preserve formatting.',
+                'evidence': [{'turn_id': turn.id, 'exact_quote': '保留原始格式'}],
+                'protected_target': None, 'implementation_delegation': None,
+            }],
+            'ambiguities': [],
+        }
+
+        class Client:
+            def interpret(self, request):
+                return SemanticModelResponse(json.dumps(payload, ensure_ascii=False))
+
+        with self.assertRaisesRegex(EvidenceValidationFailure, 'ambiguous_evidence_quote'):
+            interpret_conversation(conv, ModelBackedSemanticInterpreter(Client()))

@@ -29,12 +29,14 @@ class Client:
         return SemanticModelResponse(json.dumps(self.produce(request.context), ensure_ascii=False))
 
 
-def span_payload(value):
+def quote_payload(value):
     data = json.loads(json.dumps(value, ensure_ascii=False))
     def visit(item):
         if isinstance(item, dict):
             if set(item) >= {'turn_id', 'start', 'end', 'quote'}:
-                item.pop('quote')
+                item['exact_quote'] = item.pop('quote')
+                item.pop('start')
+                item.pop('end')
             for child in item.values():
                 visit(child)
         elif isinstance(item, list):
@@ -45,7 +47,7 @@ def span_payload(value):
 
 
 def result(context, *items):
-    return span_payload(asdict(SemanticResult(context.current_turn.id, tuple(items))))
+    return quote_payload(asdict(SemanticResult(context.current_turn.id, tuple(items))))
 
 
 def goal(context):
@@ -225,7 +227,7 @@ class ModelRuntimeTest(unittest.TestCase):
             turn = context.current_turn
             data['ambiguities'] = [{'topic': 'export format', 'description': 'Which export format is required?',
                 'decision_owner': 'user', 'materiality': 'MEDIUM', 'candidate_interpretations': [],
-                'evidence': [span_payload(asdict(claim(turn, IntentKind.GOAL, 'Export', turn.raw_text, 'export').evidence[0]))]}]
+                'evidence': [quote_payload(asdict(claim(turn, IntentKind.GOAL, 'Export', turn.raw_text, 'export').evidence[0]))]}]
             return data
         status, output, errors = self.run_cli('帮我增加导出功能。', Client(produce))
         self.assertEqual(status, 0, errors)
@@ -260,8 +262,7 @@ class ModelRuntimeTest(unittest.TestCase):
     def test_bad_evidence_is_rejected_in_normal_runtime(self):
         for edit in (
             lambda ref: ref.update(turn_id='unknown'),
-            lambda ref: ref.update(start=-1),
-            lambda ref: ref.update(end=9999),
+            lambda ref: ref.update(exact_quote='invented'),
             lambda ref: ref.update(turn_id='README.md'),
         ):
             def produce(context):
@@ -295,7 +296,7 @@ class ModelRuntimeTest(unittest.TestCase):
             self.assertEqual(context.project_facts[0].value, 'Authentication uses JWT.')
             data = json.loads(json.dumps(goal(context)))
             data['claims'][0]['evidence'][0] = {
-                'turn_id': 'auth.py', 'start': 0, 'end': 24}
+                'turn_id': 'auth.py', 'exact_quote': 'Keep authentication unchanged.'}
             return data
         interpreter = ModelBackedSemanticInterpreter(Client(produce),
             project_facts=(ProjectFact('Authentication uses JWT.', 'auth.py'),))

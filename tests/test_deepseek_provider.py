@@ -109,7 +109,7 @@ class DeepSeekTest(unittest.TestCase):
             turn = json.loads(json.loads(request.data)['messages'][1]['content'])['current_turn']
             result = {'source_turn_id': turn['id'], 'claims': [{'id': 'goal', 'concept_id': 'search', 'kind': 'goal',
                 'value': 'Add search.', 'protected_target': None, 'implementation_delegation': None,
-                'evidence': [{'turn_id': turn['id'], 'start': 0, 'end': 11}]}], 'ambiguities': []}
+                'evidence': [{'turn_id': turn['id'], 'exact_quote': turn['raw_text']}]}], 'ambiguities': []}
             return BytesIO(json.dumps(envelope(json.dumps(result))).encode())
         status, output, error = self.run_cli(transport)
         self.assertEqual(status, 0, error)
@@ -136,7 +136,7 @@ class DeepSeekTest(unittest.TestCase):
             turn = json.loads(json.loads(request.data)['messages'][1]['content'])['current_turn']
             result = {'source_turn_id': turn['id'], 'claims': [{'id': 'goal', 'concept_id': 'search', 'kind': 'goal',
                 'value': 'Add search.', 'protected_target': None, 'implementation_delegation': None,
-                'evidence': [{'turn_id': turn['id'], 'start': 0, 'end': 10}]}], 'ambiguities': []}
+                'evidence': [{'turn_id': turn['id'], 'exact_quote': 'Add search'}]}], 'ambiguities': []}
             return BytesIO(json.dumps(envelope(json.dumps(result))).encode())
         status, output, error = self.run_cli(transport)
         self.assertEqual(status, 0, error)
