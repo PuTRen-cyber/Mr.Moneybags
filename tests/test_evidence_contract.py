@@ -1,4 +1,4 @@
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from io import StringIO
 import json
 import unittest
@@ -128,13 +128,53 @@ class EvidenceContractTest(unittest.TestCase):
         self.assertEqual(failure['diagnostic']['semantic_field'], 'claims[0].evidence[0]')
         self.assertEqual(failure['diagnostic']['turn_id'], failure['conversation']['turns'][0]['id'])
         self.assertEqual(failure['code'], 'invalid_span_bounds')
-        self.assertEqual(failure['diagnostic']['quote'], raw)
+        self.assertEqual(failure['diagnostic']['quote'], '')
         self.assertIsNone(failure['diagnostic']['source_span'])
         self.assertEqual(client.calls, 1)
         self.assertNotIn('provider_response', failure)
         self.assertNotIn('instructions', failure)
         self.assertNotIn('reasoning', failure)
         self.assertNotIn('Planning:', output.getvalue())
+
+    def test_chinese_reproduction_valid_spans_materialize_exact_source_text(self):
+        raw = '课程管理系统增加作业功能。老师可以创建作业，学生可以查看。提交和评分以后再考虑。'
+        conv = conversation(raw)
+        turn = conv.turns[0]
+        goal = replace(semantic_result(turn, '课程管理系统增加作业功能', value='Manage assignments.').claims[0],
+                       id='goal', concept_id='assignment')
+        future = replace(semantic_result(turn, '提交和评分以后再考虑', value='Submission and grading are future scope.',
+                                         kind=IntentKind.FUTURE_CONSIDERATION).claims[0], id='future',
+                         concept_id='submission')
+        result = SemanticResult(turn.id, (goal, future))
+        alignment = interpret_conversation(conv, ModelBackedSemanticInterpreter(Client(result)))
+        for statement in alignment.statements:
+            evidence = statement.evidence[0]
+            self.assertEqual(evidence.quote, raw[evidence.start:evidence.end])
+
+    def test_chinese_reproduction_out_of_bounds_span_is_not_materialized(self):
+        raw = '课程管理系统增加作业功能。老师可以创建作业，学生可以查看。提交和评分以后再考虑。'
+
+        class RuntimeClient:
+            def interpret(self, request):
+                turn = request.context.current_turn
+                result = semantic_result(turn, '后再考虑。', value='Future consideration.', start=35, end=42)
+                data = asdict(result)
+                for claim in data['claims']:
+                    for evidence in claim['evidence']:
+                        evidence.pop('quote')
+                return SemanticModelResponse(json.dumps(data, ensure_ascii=False))
+
+        output, error = StringIO(), StringIO()
+        with patch('builtins.input', return_value=raw), patch('sys.stdout', output), patch('sys.stderr', error):
+            status = main(interpreter=ModelBackedSemanticInterpreter(RuntimeClient()))
+        self.assertEqual(status, 1)
+        failure = json.loads(output.getvalue().split('Interpretation Failure:\n')[1])
+        self.assertEqual(failure['category'], 'EvidenceValidationFailure')
+        self.assertEqual(failure['code'], 'invalid_span_bounds')
+        self.assertEqual(failure['diagnostic']['start'], 35)
+        self.assertEqual(failure['diagnostic']['end'], 42)
+        self.assertEqual(failure['diagnostic']['quote'], '')
+        self.assertIsNone(failure['diagnostic']['source_span'])
 
     def test_model_path_rejects_invalid_span_without_fallback(self):
         conv = conversation('不要改变当前颜色。')

@@ -19,6 +19,7 @@ text using only turn_id, start, and end. Do not generate an evidence quote. Runt
 the referenced raw_text span; quote is not model input.
 Use zero-based Python Unicode character offsets with an exclusive end. The derived evidence always satisfies
 quote = raw_text[start:end]. Choose one exact contiguous source span and include its original punctuation.
+Before returning each reference, verify 0 <= start < end <= len(raw_text); if this cannot be verified, omit the claim.
 Valid: raw_text "保存  原文。", start 0, end 7 selects the complete source text.
 Invalid: start 0, end 6 when the supporting punctuation is part of the intended evidence.
 Never cite JIA turns, summaries, or project facts as user evidence. If unsure which exact span supports a claim,

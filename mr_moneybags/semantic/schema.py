@@ -84,7 +84,9 @@ def decode_result(text: str, turns) -> SemanticResult:
         for item in items:
             turn = by_id.get(item['turn_id'])
             start, end = item['start'], item['end']
-            quote = turn.raw_text[start:end] if turn is not None else ''
+            valid_span = (turn is not None and type(start) is int and type(end) is int
+                          and 0 <= start < end <= len(turn.raw_text))
+            quote = turn.raw_text[start:end] if valid_span else ''
             references.append(EvidenceReference(item['turn_id'], start, end, quote))
         return tuple(references)
     claims = tuple(SemanticClaim(
